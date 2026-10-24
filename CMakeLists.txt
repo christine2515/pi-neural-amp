@@ -23,18 +23,6 @@ endif()
 file(GLOB NAM_SOURCES "${NAM_DIR}/NAM/*.cpp" "${NAM_DIR}/NAM/*/*.cpp")
 set(WAV_SOURCES "${NAM_DIR}/Dependencies/AudioDSPTools/dsp/wav.cpp")
 
-add_executable(bench src/bench.cpp ${NAM_SOURCES} ${WAV_SOURCES})
-target_include_directories(bench SYSTEM PRIVATE
-  "${NAM_DIR}"
-  "${NAM_DIR}/Dependencies/eigen"
-  "${NAM_DIR}/Dependencies/nlohmann"
-  "${NAM_DIR}/Dependencies/AudioDSPTools/dsp")
-# float I/O buffers: ARMv7 NEON has no double-precision SIMD.
-target_compile_definitions(bench PRIVATE NAM_SAMPLE_FLOAT)
-if(BENCH_A2_FAST)
-  target_compile_definitions(bench PRIVATE NAM_ENABLE_A2_FAST)
-endif()
-
 set(ARCH_FLAGS "")
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(armv7|armhf|arm$)")
   set(ARCH_FLAGS -mcpu=${PI_CPU} -mfpu=neon-vfpv4 -mfloat-abi=hard)
@@ -45,14 +33,42 @@ set(OPT_FLAGS -O3)
 if(BENCH_FAST_MATH)
   list(APPEND OPT_FLAGS -ffast-math)
 endif()
-target_compile_options(bench PRIVATE ${ARCH_FLAGS} ${OPT_FLAGS} -Wno-deprecated-declarations)
+
+# NAM Core compiled once (the slow part on a Pi) and shared by bench and live. OBJECT, not
+# STATIC: NAM registers model parsers from static initializers the linker would otherwise drop.
+add_library(namcore OBJECT ${NAM_SOURCES} ${WAV_SOURCES})
+target_include_directories(namcore SYSTEM PUBLIC
+  "${NAM_DIR}"
+  "${NAM_DIR}/Dependencies/eigen"
+  "${NAM_DIR}/Dependencies/nlohmann"
+  "${NAM_DIR}/Dependencies/AudioDSPTools/dsp")
+# float I/O buffers: ARMv7 NEON has no double-precision SIMD.
+target_compile_definitions(namcore PUBLIC NAM_SAMPLE_FLOAT)
+if(BENCH_A2_FAST)
+  target_compile_definitions(namcore PUBLIC NAM_ENABLE_A2_FAST)
+endif()
+target_compile_options(namcore PUBLIC ${ARCH_FLAGS} ${OPT_FLAGS} -Wno-deprecated-declarations)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  find_package(Threads REQUIRED)
+  target_link_libraries(namcore PUBLIC Threads::Threads)
+endif()
+
+add_executable(bench src/bench.cpp)
+target_link_libraries(bench PRIVATE namcore)
 
 # Record the exact build config in every summary row.
 string(REPLACE ";" " " BUILD_FLAGS_STR "${ARCH_FLAGS} ${OPT_FLAGS} a2_fast=${BENCH_A2_FAST}")
 target_compile_definitions(bench PRIVATE
   BENCH_BUILD_FLAGS="${CMAKE_CXX_COMPILER_ID}-${CMAKE_CXX_COMPILER_VERSION} ${BUILD_FLAGS_STR}")
 
+# live: ALSA client (Linux only; needs libasound2-dev).
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  find_package(Threads REQUIRED)
-  target_link_libraries(bench PRIVATE Threads::Threads)
+  find_package(ALSA)
+  if(ALSA_FOUND)
+    add_executable(live src/live.cpp)
+    target_link_libraries(live PRIVATE namcore ALSA::ALSA)
+  else()
+    message(WARNING "ALSA not found: skipping live (sudo apt install libasound2-dev)")
+  endif()
 endif()

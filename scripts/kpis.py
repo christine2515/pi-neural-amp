@@ -8,6 +8,9 @@ Outputs (all derived from CSVs bench and the samplers wrote):
   results/rt_comparison.csv       with --compare A B [C...]: p99, wake-up latency, misses per arm vs A
   results/sustained_per_minute.csv  per-minute p99 for the 30-minute run, joined with thermal data
   results/boot_summary.csv        boot-to-first-block stats over reboots
+  results/live_by_config.csv      live runs: xruns, process time, jitter per period x periods
+  results/live_smallest_buffer.csv  live: smallest xrun-free period x periods per model
+  results/live_latency_summary.csv  round-trip latency per period x periods (loopback test)
   results/kpi_tables.md           the same tables as markdown, for the README
 
 Usage: python3 scripts/kpis.py [--compare baseline rt rt_isol]
@@ -210,6 +213,58 @@ def boot():
     }]
 
 
+def live():
+    """Per live configuration (label prefix + mode/model + period x periods), aggregated over runs."""
+    path = os.path.join(RESULTS, "live_summary.csv")
+    if not os.path.exists(path):
+        return [], []
+    groups = defaultdict(list)
+    for r in read_csv(path):
+        if r["mode"] == "latency_test":
+            continue
+        tag = r["label"].split("__")[0]
+        groups[(tag, r["model"], int(r["period"]), int(r["periods"]))].append(r)
+    rows = []
+    for (tag, model, period, periods), rs in sorted(groups.items()):
+        rows.append({
+            "tag": tag, "model": model, "period": period, "periods": periods,
+            "io_buffer_ms": float(rs[0]["io_buffer_ms"]), "runs": len(rs),
+            "seconds": sum(float(r["seconds"]) for r in rs),
+            "xruns": sum(int(r["xruns"]) for r in rs),
+            "proc_p99_us": statistics.median(float(r["proc_p99_us"]) for r in rs),
+            "deadline_us": float(rs[0]["deadline_us"]),
+            "cycle_jitter_p99_us": statistics.median(float(r["cycle_jitter_p99_us"]) for r in rs),
+            "cpu_pct": statistics.median(float(r["cpu_pct"]) for r in rs),
+        })
+    best = defaultdict(list)
+    for r in rows:
+        if r["xruns"] == 0:
+            best[(r["tag"], r["model"])].append(r)
+    smallest = []
+    for (tag, model) in sorted({(r["tag"], r["model"]) for r in rows}):
+        ok = sorted(best.get((tag, model), []), key=lambda r: r["io_buffer_ms"])
+        smallest.append({
+            "tag": tag, "model": model,
+            "smallest_xrun_free": f"{ok[0]['period']}x{ok[0]['periods']}" if ok else "none",
+            "io_buffer_ms": ok[0]["io_buffer_ms"] if ok else None,
+        })
+    return rows, smallest
+
+
+def latency():
+    path = os.path.join(RESULTS, "live_latency.csv")
+    if not os.path.exists(path):
+        return []
+    groups = defaultdict(list)
+    for r in read_csv(path):
+        groups[(int(r["period"]), int(r["periods"]), int(r["rate"]))].append(float(r["roundtrip_ms"]))
+    return [{
+        "period": p, "periods": n, "clicks": len(v),
+        "roundtrip_ms_median": statistics.median(v), "roundtrip_ms_min": min(v), "roundtrip_ms_max": max(v),
+        "io_buffer_ms": 1000.0 * p * n / rate,
+    } for (p, n, rate), v in sorted(groups.items())]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--compare", nargs="+", metavar="TAG", help="baseline tag first, then arms to compare")
@@ -251,6 +306,20 @@ def main():
         f = list(bt[0].keys())
         write_csv(os.path.join(RESULTS, "boot_summary.csv"), bt, f)
         md += ["## Boot to first processed block (CLOCK_BOOTTIME, excludes firmware)", md_table(bt, f)]
+
+    lv, lv_small = live()
+    if lv:
+        f = list(lv[0].keys())
+        write_csv(os.path.join(RESULTS, "live_by_config.csv"), lv, f)
+        md += ["## Live: xruns by configuration", md_table(lv, f)]
+        f = list(lv_small[0].keys())
+        write_csv(os.path.join(RESULTS, "live_smallest_buffer.csv"), lv_small, f)
+        md += ["## Live: smallest xrun-free buffer", md_table(lv_small, f)]
+    lat = latency()
+    if lat:
+        f = list(lat[0].keys())
+        write_csv(os.path.join(RESULTS, "live_latency_summary.csv"), lat, f)
+        md += ["## Round-trip latency (loopback cable)", md_table(lat, f, None)]
 
     with open(os.path.join(RESULTS, "kpi_tables.md"), "w") as fh:
         fh.write("\n\n".join(md) + "\n")

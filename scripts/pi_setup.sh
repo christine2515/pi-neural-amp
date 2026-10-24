@@ -10,8 +10,9 @@ uname -a
 
 echo "== packages =="
 sudo apt-get update
-sudo apt-get install -y git cmake g++ python3-matplotlib python3-numpy linux-perf || \
-  sudo apt-get install -y git cmake g++ python3-matplotlib python3-numpy
+PKGS="git cmake g++ python3-matplotlib python3-numpy libasound2-dev alsa-utils"
+# shellcheck disable=SC2086
+sudo apt-get install -y $PKGS linux-perf || sudo apt-get install -y $PKGS
 
 echo "== swap (Eigen builds need it on 1 GB) =="
 if [ -f /etc/dphys-swapfile ]; then

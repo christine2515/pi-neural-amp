@@ -33,18 +33,11 @@
 #include <thread>
 #include <vector>
 
-#include <sys/utsname.h>
-#include <unistd.h>
-
-#ifdef __linux__
-  #include <pthread.h>
-  #include <sched.h>
-  #include <sys/mman.h>
-#endif
 
 #include "NAM/dsp.h"
 #include "NAM/get_dsp.h"
 #include "NAM/slimmable.h"
+#include "common.h"
 #include "wav.h"
 
 #ifndef BENCH_BUILD_FLAGS
@@ -53,7 +46,7 @@
 
 namespace
 {
-using Clock = std::chrono::steady_clock;
+using namespace pna;
 
 struct Args
 {
@@ -154,152 +147,6 @@ bool ParseArgs(int argc, char** argv, Args& a)
   return true;
 }
 
-// Apply real-time settings. Returns false (and says why) if any step fails, so a run labelled
-// rt=1 is never silently a normal run.
-bool ApplyRealtime(const Args& a)
-{
-#ifdef __linux__
-  if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0)
-  {
-    std::perror("mlockall");
-    return false;
-  }
-  // Pre-fault some stack so the first deep call in the loop doesn't page fault.
-  volatile unsigned char stack[256 * 1024];
-  for (size_t i = 0; i < sizeof(stack); i += 4096)
-    stack[i] = 0;
-
-  if (a.cpu >= 0)
-  {
-    cpu_set_t set;
-    CPU_ZERO(&set);
-    CPU_SET(a.cpu, &set);
-    if (sched_setaffinity(0, sizeof(set), &set) != 0)
-    {
-      std::perror("sched_setaffinity");
-      return false;
-    }
-  }
-  sched_param sp{};
-  sp.sched_priority = a.rtPrio;
-  if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &sp) != 0)
-  {
-    std::cerr << "pthread_setschedparam(SCHED_FIFO) failed: run with sudo or set an rtprio limit\n";
-    return false;
-  }
-  return true;
-#else
-  (void)a;
-  std::cerr << "--rt is only supported on Linux\n";
-  return false;
-#endif
-}
-
-bool PinOnly(int cpu)
-{
-#ifdef __linux__
-  cpu_set_t set;
-  CPU_ZERO(&set);
-  CPU_SET(cpu, &set);
-  if (sched_setaffinity(0, sizeof(set), &set) != 0)
-  {
-    std::perror("sched_setaffinity");
-    return false;
-  }
-  return true;
-#else
-  (void)cpu;
-  std::cerr << "--cpu is only supported on Linux\n";
-  return false;
-#endif
-}
-
-double ProcessCpuSeconds()
-{
-  timespec ts{};
-  clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
-  return ts.tv_sec + ts.tv_nsec * 1e-9;
-}
-
-double BootSeconds()
-{
-#ifdef __linux__
-  timespec ts{};
-  clock_gettime(CLOCK_BOOTTIME, &ts);
-  return ts.tv_sec + ts.tv_nsec * 1e-9;
-#else
-  return -1.0;
-#endif
-}
-
-std::string ReadFirstLine(const char* path)
-{
-  std::ifstream f(path);
-  std::string line;
-  if (f && std::getline(f, line))
-    return line;
-  return "na";
-}
-
-// Absolute sleep on the monotonic clock. On Linux, steady_clock is CLOCK_MONOTONIC, so
-// clock_nanosleep(TIMER_ABSTIME) avoids the relative-sleep error of sleep_until.
-void SleepUntil(Clock::time_point target)
-{
-#ifdef __linux__
-  const auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(target.time_since_epoch()).count();
-  timespec ts{};
-  ts.tv_sec = static_cast<time_t>(ns / 1000000000LL);
-  ts.tv_nsec = static_cast<long>(ns % 1000000000LL);
-  while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, nullptr) == EINTR)
-  {
-  }
-#else
-  std::this_thread::sleep_until(target);
-#endif
-}
-
-// Kernel release plus preemption model ("PREEMPT_RT", "PREEMPT", or "none"), from uname.
-std::string KernelInfo()
-{
-  utsname u{};
-  if (uname(&u) != 0)
-    return "unknown";
-  const std::string v = u.version;
-  const char* preempt = v.find("PREEMPT_RT") != std::string::npos ? "PREEMPT_RT"
-                        : v.find("PREEMPT") != std::string::npos  ? "PREEMPT"
-                                                                  : "none";
-  return std::string(u.release) + " " + preempt;
-}
-
-// Name of the submodel a slimmable size selects. NAM A2 files hold two: Lite then Full.
-std::string SlimVariantName(const std::vector<double>& breakpoints, double v)
-{
-  size_t idx = 0;
-  while (idx < breakpoints.size() && v >= breakpoints[idx])
-    idx++;
-  if (breakpoints.size() == 1)
-    return idx == 0 ? "lite" : "full";
-  return "s" + std::to_string(idx);
-}
-
-std::string Hostname()
-{
-  char buf[256] = {0};
-  if (gethostname(buf, sizeof(buf) - 1) != 0)
-    return "unknown";
-  return buf;
-}
-
-double Percentile(const std::vector<int64_t>& sorted, double p)
-{
-  if (sorted.empty())
-    return 0.0;
-  // Nearest-rank percentile.
-  size_t rank = static_cast<size_t>(std::ceil(p / 100.0 * sorted.size()));
-  rank = std::clamp<size_t>(rank, 1, sorted.size());
-  return static_cast<double>(sorted[rank - 1]);
-}
-
 bool WriteWavFloat32(const std::string& path, const std::vector<float>& samples, uint32_t sr)
 {
   std::ofstream out(path, std::ios::binary);
@@ -324,12 +171,6 @@ bool WriteWavFloat32(const std::string& path, const std::vector<float>& samples,
   return out.good();
 }
 
-void EnsureParentDir(const std::string& path)
-{
-  const auto parent = std::filesystem::path(path).parent_path();
-  if (!parent.empty())
-    std::filesystem::create_directories(parent);
-}
 } // namespace
 
 int main(int argc, char** argv)
@@ -433,7 +274,7 @@ int main(int argc, char** argv)
 
   if (a.rt)
   {
-    if (!ApplyRealtime(a))
+    if (!ApplyRealtime(a.rtPrio, a.cpu))
       return 3;
   }
   else if (a.cpu >= 0)

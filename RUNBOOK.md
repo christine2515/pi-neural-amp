@@ -97,6 +97,31 @@ Disable afterwards: `sudo systemctl disable pi-neural-amp`.
 
 Copy back to the laptop: `rsync -a <you>@pi-amp.local:~/pi-neural-amp/results/ results/`
 
+## 8. Live tuning with the Scarlett (after the offline runs)
+
+Wiring: guitar → Scarlett input 1 (INST on) → USB → Pi → Scarlett headphones. **Direct Monitor off.**
+If the Scarlett drops out or crackles, power it from a powered USB hub instead of the Pi.
+
+    arecord -l                     # find the card name; usually "USB" -> DEVICE=hw:USB
+    ./build/live --model models/a2_fender_super_reverb.nam --slim 1 --period 128 --periods 2 --duration 60
+
+That's the playable amp. Each run appends a row to `results/live_summary.csv` (xruns, process
+time, period jitter, CPU). Then tune:
+
+    ./scripts/live_sweep.sh                                       # baseline: 32-256 frames x 2/3 periods
+    EXTRA="--rt --cpu 3" TAG=live_rt ./scripts/live_sweep.sh      # same with real-time scheduling
+    python3 scripts/kpis.py                                       # live_by_config / live_smallest_buffer
+
+The offline `kpi_smallest_block.csv` predicts where live should start working; the gap between
+the two is driver + USB overhead (`--bypass` rows show it with no model at all).
+
+**Round-trip latency.** Unplug the guitar and connect a cable from a Scarlett output to input 1:
+
+    ./scripts/latency_test.sh                                     # results/live_latency.csv
+
+`live_latency_summary.csv` shows measured round trip next to the buffer size (period × periods).
+The difference is converter + USB latency. The Reddit Pi 5 post reports 3.5 ms with a Scarlett.
+
 ## Resume line: where each number comes from
 | Placeholder | Source |
 |---|---|

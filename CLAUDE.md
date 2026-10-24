@@ -19,6 +19,7 @@ sustained performance over 30 minutes.
 
 ## Layout
 src/bench.cpp   offline real-time benchmark (file in, timings out)
-src/live.cpp    optional live ALSA/JACK client
+src/live.cpp    live ALSA client + round-trip latency test (Linux)
+src/common.h    RT setup, clocks, stats shared by bench and live
 scripts/        thermal logger, memory sampler, boot timing, plots
 results/        CSVs and charts
