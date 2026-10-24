@@ -1,4 +1,5 @@
 build/
+build-*/
 models/*
 !models/README.md
 audio/*

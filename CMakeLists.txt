@@ -13,6 +13,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Check `grep -m1 "CPU part" /proc/cpuinfo`: 0xc07 = A7, 0xd03 = A53.
 set(PI_CPU "cortex-a7" CACHE STRING "ARM -mcpu for armhf builds")
 option(BENCH_FAST_MATH "Compile with -ffast-math" OFF)
+option(BENCH_A2_FAST "Use NAM's hand-optimized A2 WaveNet path (OFF = generic WaveNet)" ON)
 
 set(NAM_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/NeuralAmpModelerCore")
 if(NOT EXISTS "${NAM_DIR}/NAM/dsp.h")
@@ -29,7 +30,10 @@ target_include_directories(bench SYSTEM PRIVATE
   "${NAM_DIR}/Dependencies/nlohmann"
   "${NAM_DIR}/Dependencies/AudioDSPTools/dsp")
 # float I/O buffers: ARMv7 NEON has no double-precision SIMD.
-target_compile_definitions(bench PRIVATE NAM_SAMPLE_FLOAT NAM_ENABLE_A2_FAST)
+target_compile_definitions(bench PRIVATE NAM_SAMPLE_FLOAT)
+if(BENCH_A2_FAST)
+  target_compile_definitions(bench PRIVATE NAM_ENABLE_A2_FAST)
+endif()
 
 set(ARCH_FLAGS "")
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(armv7|armhf|arm$)")
@@ -44,7 +48,7 @@ endif()
 target_compile_options(bench PRIVATE ${ARCH_FLAGS} ${OPT_FLAGS} -Wno-deprecated-declarations)
 
 # Record the exact build config in every summary row.
-string(REPLACE ";" " " BUILD_FLAGS_STR "${ARCH_FLAGS} ${OPT_FLAGS}")
+string(REPLACE ";" " " BUILD_FLAGS_STR "${ARCH_FLAGS} ${OPT_FLAGS} a2_fast=${BENCH_A2_FAST}")
 target_compile_definitions(bench PRIVATE
   BENCH_BUILD_FLAGS="${CMAKE_CXX_COMPILER_ID}-${CMAKE_CXX_COMPILER_VERSION} ${BUILD_FLAGS_STR}")
 

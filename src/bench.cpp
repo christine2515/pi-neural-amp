@@ -44,6 +44,7 @@
 
 #include "NAM/dsp.h"
 #include "NAM/get_dsp.h"
+#include "NAM/slimmable.h"
 #include "wav.h"
 
 #ifndef BENCH_BUILD_FLAGS
@@ -70,6 +71,8 @@ struct Args
   std::string summaryOut = "results/summary.csv";
   std::string firstBlockOut; // boot-time CSV; empty = skip
   std::string renderOut;     // processed audio WAV; empty = skip
+  double slim = -1.0;        // slimmable size 0..1; <0 = model default
+  bool printSlimSizes = false;
 };
 
 void Usage()
@@ -86,7 +89,9 @@ void Usage()
                "  --blocks-out F.csv   per-block timings\n"
                "  --summary-out F.csv  summary row is appended here (default results/summary.csv)\n"
                "  --first-block-out F  write CLOCK_BOOTTIME at end of first block (boot timing)\n"
-               "  --render F.wav       write processed audio\n";
+               "  --render F.wav       write processed audio\n"
+               "  --slim V             slimmable (A2) models: pick the submodel for size V in 0..1\n"
+               "  --print-slim-sizes   print one size value + name per submodel, then exit\n";
 }
 
 bool ParseArgs(int argc, char** argv, Args& a)
@@ -130,6 +135,10 @@ bool ParseArgs(int argc, char** argv, Args& a)
       a.firstBlockOut = next("--first-block-out");
     else if (s == "--render")
       a.renderOut = next("--render");
+    else if (s == "--slim")
+      a.slim = std::atof(next("--slim"));
+    else if (s == "--print-slim-sizes")
+      a.printSlimSizes = true;
     else if (s == "-h" || s == "--help")
       return false;
     else
@@ -138,7 +147,7 @@ bool ParseArgs(int argc, char** argv, Args& a)
       return false;
     }
   }
-  if (a.model.empty() || a.input.empty() || a.block <= 0 || a.block > 8192 || a.warmupBlocks < 0)
+  if (a.model.empty() || (a.input.empty() && !a.printSlimSizes) || a.slim > 1.0 || a.block <= 0 || a.block > 8192 || a.warmupBlocks < 0)
     return false;
   if (a.rt && a.cpu < 0)
     a.cpu = 3;
@@ -262,6 +271,17 @@ std::string KernelInfo()
   return std::string(u.release) + " " + preempt;
 }
 
+// Name of the submodel a slimmable size selects. NAM A2 files hold two: Lite then Full.
+std::string SlimVariantName(const std::vector<double>& breakpoints, double v)
+{
+  size_t idx = 0;
+  while (idx < breakpoints.size() && v >= breakpoints[idx])
+    idx++;
+  if (breakpoints.size() == 1)
+    return idx == 0 ? "lite" : "full";
+  return "s" + std::to_string(idx);
+}
+
 std::string Hostname()
 {
   char buf[256] = {0};
@@ -336,6 +356,25 @@ int main(int argc, char** argv)
     return 1;
   }
 
+  auto* slimmable = dynamic_cast<nam::SlimmableModel*>(model.get());
+  const std::vector<double> breakpoints = slimmable ? slimmable->GetSlimmableSizeBreakpoints() : std::vector<double>{};
+  if (a.printSlimSizes)
+  {
+    // One representative size per submodel: the midpoint of its range (1.0 for the largest).
+    for (size_t k = 0; k <= breakpoints.size() && slimmable; k++)
+    {
+      const double lo = k == 0 ? 0.0 : breakpoints[k - 1];
+      const double v = k == breakpoints.size() ? 1.0 : (lo + breakpoints[k]) / 2.0;
+      std::printf("%g %s\n", v, SlimVariantName(breakpoints, v).c_str());
+    }
+    return 0;
+  }
+  if (a.slim >= 0.0 && !slimmable)
+  {
+    std::cerr << "--slim given but " << a.model << " is not a slimmable model\n";
+    return 1;
+  }
+
   // ---- Load input ----
   std::vector<float> audio;
   double fileRate = 0.0;
@@ -362,6 +401,11 @@ int main(int argc, char** argv)
   // ---- Reset (allocates internal buffers; prewarms by default) ----
   const auto tReset0 = Clock::now();
   model->Reset(sr, N);
+  if (a.slim >= 0.0)
+  {
+    slimmable->SetSlimmableSize(a.slim); // resets the newly selected submodel
+    model->Reset(sr, N);                 // and prewarm it through the normal path
+  }
   const auto tReset1 = Clock::now();
 
   // ---- Preallocate everything the loop touches ----
@@ -474,7 +518,9 @@ int main(int argc, char** argv)
   const double cpuPct = wallS > 0 ? 100.0 * (cpu1 - cpu0) / wallS : 0.0;
   const double loadMs = std::chrono::duration<double, std::milli>(tLoad1 - tLoad0).count();
   const double resetMs = std::chrono::duration<double, std::milli>(tReset1 - tReset0).count();
-  const std::string modelName = std::filesystem::path(a.model).filename().string();
+  std::string modelName = std::filesystem::path(a.model).filename().string();
+  if (a.slim >= 0.0)
+    modelName += "@" + SlimVariantName(breakpoints, a.slim);
 
   // ---- Outputs ----
   if (!a.blocksOut.empty())

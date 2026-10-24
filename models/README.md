@@ -1,4 +1,9 @@
 # models/
 
-Put .nam files here (not committed). Use one amp capture in several sizes so size is the only variable,
-and name them so they sort by size, e.g. `1_nano.nam 2_feather.nam 3_lite.nam 4_standard.nam`.
+Put .nam files here (not committed).
+
+- **A2 files** (`"architecture": "SlimmableContainer"`) hold two submodels, Lite and Full. The sweep
+  runs both automatically as `<name>@lite` and `<name>@full`, so one A2 file gives you a same-amp
+  size comparison.
+- Current: `a2_fender_super_reverb.nam` (Fender Super Reverb 1965 amp + cab, A2, 48 kHz,
+  modeled by amalgamaudio, from TONE3000). Lite = 3 channels, Full = 8 channels, same 23 layers.

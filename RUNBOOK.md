@@ -23,7 +23,8 @@ detects A7 vs A53 and builds with `-j2`. When it finishes, log out and back in (
 If the build is still crawling after ~45 min, check `free -m`: if swap is pinned, `-j1`.
 
 ## 2. Inputs (while it builds)
-- `models/`: one TONE3000 capture in several sizes (standard / lite / feather / nano), named to sort by size.
+- `models/`: `a2_fender_super_reverb.nam` is already there. It's an A2 file, so every sweep runs it
+  twice, as `@lite` (3 channels) and `@full` (8 channels): same amp, two sizes.
 - `audio/di.wav`: 30-60 s mono 48 kHz guitar DI.
 - `rsync -a models audio <you>@pi-amp.local:~/pi-neural-amp/`
 
@@ -61,6 +62,17 @@ for p99 block time and p99 wake-up latency. Charts: `rt_comparison.png`, `wake_l
 Optional burst-mode baseline (no `--rt`, see note in `compare_rt.sh`):
 
     TAG=burst MODE=burst ./scripts/sweep.sh
+
+### 4c. Optional optimization: NAM's A2 fast path on vs off
+
+`bench` is built with NAM's hand-optimized A2 WaveNet path. Build a second copy with the generic
+path (another long Pi build, so start it before something slow like the 30-minute run):
+
+    cmake -S . -B build-generic -DCMAKE_BUILD_TYPE=Release -DBENCH_A2_FAST=OFF && cmake --build build-generic -j2
+    BENCH=./build-generic/bench TAG=a2_generic ./scripts/sweep.sh
+    python3 scripts/kpis.py --compare a2_generic baseline
+
+`build_flags` in each summary row records `a2_fast=ON/OFF`.
 
 ## 5. Profile the hot loop with perf (10 min; needed for "profiled with perf")
 
