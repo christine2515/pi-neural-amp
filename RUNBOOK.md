@@ -22,6 +22,18 @@ On the Pi:
 detects A7 vs A53 and builds with `-j2`. When it finishes, log out and back in (for the group).
 If the build is still crawling after ~45 min, check `free -m`: if swap is pinned, `-j1`.
 
+### 1b. Cross-compiling on the Mac (instead of the slow Pi build)
+One-time: `brew install lld` (Apple clang compiles; LLVM lld links ELF). Then:
+
+    ./scripts/cross_build.sh                       # fetches .sysroot/ (Debian Bookworm armhf) once, builds build-armhf/
+    PI_USER=<you> ./scripts/deploy.sh              # rsyncs bench + live to ~/pi-neural-amp/build/ on the Pi
+
+A2-generic copy for 4c: `BUILD_DIR=build-armhf-generic ./scripts/cross_build.sh -DBENCH_A2_FAST=OFF`, then
+`PI_USER=<you> BUILD_DIR=build-armhf-generic DEST=build-generic ./scripts/deploy.sh`. Binaries link the Pi's own
+glibc/libstdc++ (needs Bookworm or newer). They are built with clang, not the Pi's GCC: `build_flags` in the
+summary CSVs says `AppleClang-...`, so don't mix cross-built and Pi-built numbers in one comparison.
+For an A53 board add `-DPI_CPU=cortex-a53`.
+
 ## 2. Inputs (while it builds)
 - `models/`: `a2_fender_super_reverb.nam` is already there. It's an A2 file, so every sweep runs it
   twice, as `@lite` (3 channels) and `@full` (8 channels): same amp, two sizes.

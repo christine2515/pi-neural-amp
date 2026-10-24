@@ -11,3 +11,5 @@ __pycache__/
 .venv/
 .DS_Store
 audio/raw/
+.sysroot/
+build-armhf*/
