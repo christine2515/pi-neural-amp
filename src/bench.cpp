@@ -12,8 +12,13 @@
 // The timed loop does no allocation, locking, logging or I/O. In --paced mode the only
 // syscall is the sleep between blocks, which stands in for waiting on the audio interrupt
 // and sits outside the timed region.
+//
+// In --paced mode bench also records wake-up latency: how late the thread wakes after each
+// sleep (actual wake - scheduled deadline). That is the scheduler's contribution, which
+// isolcpus / PREEMPT_RT target. A block "misses with wake" when wake + process > deadline.
 
 #include <algorithm>
+#include <cerrno>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -28,6 +33,7 @@
 #include <thread>
 #include <vector>
 
+#include <sys/utsname.h>
 #include <unistd.h>
 
 #ifdef __linux__
@@ -226,6 +232,36 @@ std::string ReadFirstLine(const char* path)
   return "na";
 }
 
+// Absolute sleep on the monotonic clock. On Linux, steady_clock is CLOCK_MONOTONIC, so
+// clock_nanosleep(TIMER_ABSTIME) avoids the relative-sleep error of sleep_until.
+void SleepUntil(Clock::time_point target)
+{
+#ifdef __linux__
+  const auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(target.time_since_epoch()).count();
+  timespec ts{};
+  ts.tv_sec = static_cast<time_t>(ns / 1000000000LL);
+  ts.tv_nsec = static_cast<long>(ns % 1000000000LL);
+  while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, nullptr) == EINTR)
+  {
+  }
+#else
+  std::this_thread::sleep_until(target);
+#endif
+}
+
+// Kernel release plus preemption model ("PREEMPT_RT", "PREEMPT", or "none"), from uname.
+std::string KernelInfo()
+{
+  utsname u{};
+  if (uname(&u) != 0)
+    return "unknown";
+  const std::string v = u.version;
+  const char* preempt = v.find("PREEMPT_RT") != std::string::npos ? "PREEMPT_RT"
+                        : v.find("PREEMPT") != std::string::npos  ? "PREEMPT"
+                                                                  : "none";
+  return std::string(u.release) + " " + preempt;
+}
+
 std::string Hostname()
 {
   char buf[256] = {0};
@@ -340,11 +376,16 @@ int main(int argc, char** argv)
   NAM_SAMPLE* outPtrs[1] = {outBuf.data()};
   std::vector<int64_t> blockNs(totalBlocks, 0);
   std::vector<int64_t> startNs(totalBlocks, 0);
+  std::vector<int64_t> wakeNs(totalBlocks, 0); // lateness of the wake-up before block b (paced only)
   std::vector<float> rendered;
   if (!a.renderOut.empty())
     rendered.assign(totalBlocks * N, 0.0f);
 
   const std::string governor = ReadFirstLine("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor");
+  std::string isolated = ReadFirstLine("/sys/devices/system/cpu/isolated");
+  if (isolated.empty())
+    isolated = "none";
+  const std::string kernel = KernelInfo();
 
   if (a.rt)
   {
@@ -384,7 +425,13 @@ int main(int argc, char** argv)
         rendered[b * N + i] = static_cast<float>(outBuf[i]);
 
     if (a.paced)
-      std::this_thread::sleep_until(loopStart + std::chrono::nanoseconds(periodNs * static_cast<int64_t>(b + 1)));
+    {
+      const auto target = loopStart + std::chrono::nanoseconds(periodNs * static_cast<int64_t>(b + 1));
+      SleepUntil(target);
+      // If the block overran, no sleep happened and this is how far behind schedule we are.
+      if (b + 1 < totalBlocks)
+        wakeNs[b + 1] = std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - target).count();
+    }
   }
 
   const auto loopEnd = Clock::now();
@@ -402,6 +449,16 @@ int main(int argc, char** argv)
   }
   std::vector<int64_t> sorted = measured;
   std::sort(sorted.begin(), sorted.end());
+
+  std::vector<int64_t> wakeSorted(wakeNs.begin() + a.warmupBlocks, wakeNs.end());
+  std::sort(wakeSorted.begin(), wakeSorted.end());
+  size_t missedWithWake = 0;
+  for (size_t b = a.warmupBlocks; b < totalBlocks; b++)
+    if (wakeNs[b] + blockNs[b] > periodNs)
+      missedWithWake++;
+  const double wakeP50 = a.paced ? Percentile(wakeSorted, 50) / 1e3 : 0.0;
+  const double wakeP99 = a.paced ? Percentile(wakeSorted, 99) / 1e3 : 0.0;
+  const double wakeMax = a.paced && !wakeSorted.empty() ? wakeSorted.back() / 1e3 : 0.0;
 
   const double deadlineUs = periodNs / 1e3;
   const double p50 = Percentile(sorted, 50) / 1e3;
@@ -424,10 +481,10 @@ int main(int argc, char** argv)
   {
     EnsureParentDir(a.blocksOut);
     std::ofstream f(a.blocksOut);
-    f << "block_index,warmup,start_ns,elapsed_ns,deadline_ns\n";
+    f << "block_index,warmup,start_ns,elapsed_ns,deadline_ns,wake_ns\n";
     for (size_t b = 0; b < totalBlocks; b++)
       f << b << "," << (b < static_cast<size_t>(a.warmupBlocks) ? 1 : 0) << "," << startNs[b] << "," << blockNs[b]
-        << "," << periodNs << "\n";
+        << "," << periodNs << "," << wakeNs[b] << "\n";
   }
 
   {
@@ -436,13 +493,16 @@ int main(int argc, char** argv)
     std::ofstream f(a.summaryOut, std::ios::app);
     if (!exists)
       f << "unix_time,host,label,model,block,sample_rate,deadline_us,measured_blocks,warmup_blocks,"
-           "p50_us,p90_us,p99_us,p999_us,max_us,mean_us,missed,missed_pct,dsp_load_pct,cpu_pct,"
-           "paced,rt,rt_prio,cpu,governor,load_ms,reset_ms,build_flags\n";
+           "p50_us,p90_us,p99_us,p999_us,max_us,mean_us,missed,missed_pct,"
+           "wake_p50_us,wake_p99_us,wake_max_us,missed_with_wake,dsp_load_pct,cpu_pct,"
+           "paced,rt,rt_prio,cpu,isolated_cpus,governor,kernel,load_ms,reset_ms,build_flags\n";
     f << std::time(nullptr) << "," << Hostname() << "," << a.label << "," << modelName << "," << N << "," << sr
       << "," << deadlineUs << "," << measured.size() << "," << a.warmupBlocks << "," << p50 << "," << p90 << ","
       << p99 << "," << p999 << "," << maxUs << "," << meanUs << "," << missed << "," << missedPct << ","
-      << dspLoadPct << "," << cpuPct << "," << a.paced << "," << a.rt << "," << (a.rt ? a.rtPrio : 0) << ","
-      << a.cpu << "," << governor << "," << loadMs << "," << resetMs << ",\"" << BENCH_BUILD_FLAGS << "\"\n";
+      << wakeP50 << "," << wakeP99 << "," << wakeMax << "," << missedWithWake << "," << dspLoadPct << ","
+      << cpuPct << "," << a.paced << "," << a.rt << "," << (a.rt ? a.rtPrio : 0) << "," << a.cpu << ",\""
+      << isolated << "\"," << governor << ",\"" << kernel << "\"," << loadMs << "," << resetMs << ",\""
+      << BENCH_BUILD_FLAGS << "\"\n";
   }
 
   if (!a.firstBlockOut.empty() && bootAtLoopStart >= 0 && totalBlocks > 0)
@@ -469,5 +529,8 @@ int main(int argc, char** argv)
               "cpu=%.1f%%%s%s\n",
               modelName.c_str(), N, deadlineUs, p50, p99, maxUs, missed, measured.size(), missedPct, dspLoadPct,
               cpuPct, a.paced ? " paced" : "", a.rt ? " rt" : "");
+  if (a.paced)
+    std::printf("  wake p50=%.1fus p99=%.1fus max=%.1fus missed_with_wake=%zu\n", wakeP50, wakeP99, wakeMax,
+                missedWithWake);
   return 0;
 }

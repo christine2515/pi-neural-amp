@@ -77,26 +77,33 @@ def plot_missed(kpis):
     save(fig, "missed_deadlines.png")
 
 
+def _grouped_bars(rows, prefix, ylabel, title, fname, log=True):
+    tags = [k[len(prefix):] for k in rows[0] if k.startswith(prefix)]
+    labels = [f"{r['model']}\n{r['block']}" for r in rows]
+    x = list(range(len(rows)))
+    w = 0.8 / len(tags)
+    fig, ax = plt.subplots(figsize=(max(6, 0.25 * len(rows) * len(tags) + 2), 4))
+    for j, t in enumerate(tags):
+        ax.bar([i - 0.4 + w * (j + 0.5) for i in x], [float(r[prefix + t]) / 1000 for r in rows], w, label=t)
+    ax.scatter(x, [float(r["deadline_ms"]) for r in rows], color="crimson", marker="_", s=300,
+               label="deadline", zorder=3)
+    ax.set_xticks(x, labels, fontsize=7, rotation=90)
+    ax.set_ylabel(ylabel)
+    if log:
+        ax.set_yscale("log")
+    ax.set_title(title)
+    ax.legend()
+    ax.grid(alpha=0.3, axis="y")
+    save(fig, fname)
+
+
 def plot_compare(rows):
     if not rows:
         return
-    keys = list(rows[0].keys())
-    a_key = next(k for k in keys if k.startswith("p99_us_"))
-    b_key = [k for k in keys if k.startswith("p99_us_")][1]
-    labels = [f"{r['model']}\n{r['block']}" for r in rows]
-    x = range(len(rows))
-    fig, ax = plt.subplots(figsize=(max(6, 0.6 * len(rows)), 4))
-    ax.bar([i - 0.2 for i in x], [float(r[a_key]) / 1000 for r in rows], 0.4, label=a_key[7:])
-    ax.bar([i + 0.2 for i in x], [float(r[b_key]) / 1000 for r in rows], 0.4, label=b_key[7:])
-    ax.scatter(list(x), [float(r["deadline_ms"]) for r in rows], color="crimson", marker="_", s=300,
-               label="deadline", zorder=3)
-    ax.set_xticks(list(x), labels, fontsize=7, rotation=90)
-    ax.set_ylabel("p99 block time (ms)")
-    ax.set_yscale("log")
-    ax.set_title("p99 block time: baseline vs --rt")
-    ax.legend()
-    ax.grid(alpha=0.3, axis="y")
-    save(fig, "rt_comparison.png")
+    _grouped_bars(rows, "p99_us_", "p99 block time (ms)", "p99 block time by scheduling arm", "rt_comparison.png")
+    if any(float(r[k]) > 0 for r in rows for k in r if k.startswith("wake_p99_us_")):
+        _grouped_bars(rows, "wake_p99_us_", "p99 wake-up latency (ms)", "p99 wake-up latency by scheduling arm",
+                      "wake_latency.png")
 
 
 def plot_memory(rows):

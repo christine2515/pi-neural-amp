@@ -45,6 +45,19 @@ Writes `summary_baseline.csv`, `summary_rt.csv`, `kpi_by_block.csv`, `kpi_smalle
 `rt_comparison.csv`, `kpi_memory.csv` (KPI 4 comes free: PSS + CPU% are sampled on every run).
 Quick look: `cat results/kpi_tables.md`.
 
+Paced runs also record **wake-up latency** (`wake_p99_us`, `missed_with_wake`): how late the thread
+woke after each sleep. That's the scheduler's share of the deadline, separate from model compute.
+
+### 4b. Third arm: isolated core (~25 min + 2 reboots)
+
+    ./scripts/isolcpus.sh enable 3 && sudo reboot
+    ./scripts/isolcpus.sh status           # expect "isolated: 3"
+    ./scripts/compare_rt.sh                # skips arms already run, adds rt_isol, rebuilds the table
+    ./scripts/isolcpus.sh disable && sudo reboot
+
+`rt_comparison.csv` then has baseline / rt / rt_isol columns side by side, plus % change vs baseline
+for p99 block time and p99 wake-up latency. Charts: `rt_comparison.png`, `wake_latency.png`.
+
 Optional burst-mode baseline (no `--rt`, see note in `compare_rt.sh`):
 
     TAG=burst MODE=burst ./scripts/sweep.sh
