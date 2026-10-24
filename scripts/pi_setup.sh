@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # One-time Pi setup: packages, swap for the build, real-time limits, build.
 # Run from the repo root on the Pi:  ./scripts/pi_setup.sh
+# With cross-compiled binaries (scripts/cross_build.sh + deploy.sh): SKIP_BUILD=1 ./scripts/pi_setup.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -29,6 +30,13 @@ sudo tee /etc/security/limits.d/99-pi-neural-amp.conf >/dev/null <<'EOF'
 EOF
 sudo usermod -aG audio "$USER"
 echo "Log out and back in (or reboot) for the audio group / limits to apply."
+
+if [ "${SKIP_BUILD:-0}" = 1 ]; then
+  echo "== SKIP_BUILD=1: not building; deploy cross-built binaries from the Mac =="
+  cat /etc/os-release | grep -E "^(PRETTY_NAME|VERSION_CODENAME)="
+  ldd --version | head -1
+  exit 0
+fi
 
 echo "== submodules =="
 git submodule update --init --recursive
