@@ -1,5 +1,11 @@
 # NAM Core optimization candidates for the Pi 2
 
+> **Superseded by [optimization-roadmap.md](optimization-roadmap.md)**, which adds Pi measurements and corrects
+> two points here: (1) with clang, `-funsafe-math-optimizations` alone does *not* vectorize Lite (the full
+> `-ffast-math` set or a `#pragma clang loop vectorize(enable)` does; GCC 12 is unverified); (2) Full's
+> *actively used* history at block 128 is ~294 KiB, which fits the 512 KB L2 (the 548 KiB figure is the
+> allocated size).
+
 Investigation notes for the Fender A2 model (`a2_fender_super_reverb.nam`, Lite = 3 channels,
 Full = 8 channels, 23 layers). Nothing here is a Pi measurement yet. Each item says what evidence
 exists and what to run on the Pi to measure it. Ranked by expected payoff per hour of work.
