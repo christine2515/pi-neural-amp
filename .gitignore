@@ -10,3 +10,4 @@ results/*.wav
 __pycache__/
 .venv/
 .DS_Store
+audio/raw/
