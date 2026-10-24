@@ -1,0 +1,20 @@
+# Starts the benchmark at boot and records when the first block is processed.
+# Install with: ./scripts/install_boot_unit.sh models/<file>.nam
+[Unit]
+Description=pi-neural-amp boot-to-first-block benchmark
+After=local-fs.target
+# No network dependency: we want the earliest point audio could start.
+
+[Service]
+Type=oneshot
+User=@USER@
+WorkingDirectory=@REPO@
+LimitRTPRIO=95
+LimitMEMLOCK=infinity
+ExecStart=@REPO@/build/bench --model @MODEL@ --input @REPO@/audio/di.wav --block 128 --warmup 0 --duration 5 \
+  --paced --label boot --summary-out @REPO@/results/summary_boot.csv \
+  --first-block-out @REPO@/results/boot_first_block.csv
+ExecStartPost=/bin/sh -c 'systemd-analyze time >> @REPO@/results/boot_systemd_analyze.txt 2>&1 || true'
+
+[Install]
+WantedBy=multi-user.target

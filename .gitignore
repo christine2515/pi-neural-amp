@@ -1,0 +1,11 @@
+build/
+models/*
+!models/README.md
+audio/*
+!audio/README.md
+results/blocks/
+results/mem/
+results/*.wav
+__pycache__/
+.venv/
+.DS_Store
