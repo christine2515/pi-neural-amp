@@ -55,6 +55,19 @@ speedup and has a clean test (null test plus sweep). (3) is the product number (
 buffer) and may show the USB path is the limit. (4) and (5) are the only routes to Full, and they cost
 the most.
 
+### Decisions so far (Christine)
+
+- **PREEMPT_RT (item 13): planned for later.** I'll build my own `rpi-7.1.y`+ kernel with
+  `PREEMPT_RT=y`. Before that, take the stock-kernel `compare_rt.sh` and `live_sweep.sh` numbers
+  as the baseline to compare against. Check the dwc_otg FIQ issue and the USB IRQ thread priority
+  when it boots. Cross-compile it rather than building on the Pi.
+- **ALSA mmap (item 14): in the plan.** Add `--mmap` to `live` and run it as its own `live_sweep.sh`
+  arm (`TAG=live_mmap`), even though the expected effect is small. It's cheap, and "no change" is
+  a result worth reporting.
+- **I2S converters (item 16): a consideration for later.** Decide after the USB floor is measured
+  (`live --bypass` + `latency_test.sh`, item 15). If the Scarlett path sets the latency floor, an
+  I2S ADC/DAC HAT plus a guitar buffer is the next hardware step.
+
 ---
 
 ## 2. Ranked table
