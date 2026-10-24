@@ -12,7 +12,10 @@ SSH with public key. Ethernet to the router, power on, then:
 ## 1. Copy the repo and build (start before anything else, it's the slow part)
 From the laptop, in the folder that contains `pi-neural-amp/`:
 
-    rsync -a --exclude build --exclude .venv pi-neural-amp <you>@pi-amp.local:~/
+    rsync -a --exclude 'build*' --exclude .sysroot --exclude .venv --exclude audio/raw --exclude results pi-neural-amp <you>@pi-amp.local:~/
+
+**Always `--exclude results`**: rsync overwrites files with the same name, so Mac test runs in
+`results/summary.csv` would replace the Pi's. The `host` column in every CSV shows which machine wrote a row.
 
 On the Pi:
 
@@ -38,7 +41,7 @@ For an A53 board add `-DPI_CPU=cortex-a53`.
 - `models/`: `a2_fender_super_reverb.nam` is already there. It's an A2 file, so every sweep runs it
   twice, as `@lite` (3 channels) and `@full` (8 channels): same amp, two sizes.
 - `audio/di.wav`: 30-60 s mono 48 kHz guitar DI.
-- `rsync -a models audio <you>@pi-amp.local:~/pi-neural-amp/`
+- `rsync -a --exclude raw models audio <you>@pi-amp.local:~/pi-neural-amp/`
 
 Sanity check that it sounds like an amp (laptop build is fine for this):
 
@@ -107,7 +110,8 @@ Disable afterwards: `sudo systemctl disable pi-neural-amp`.
     python3 scripts/kpis.py --compare baseline rt
     python3 scripts/plot.py --blocks results/blocks/baseline/<model>__128__r1.csv
 
-Copy back to the laptop: `rsync -a <you>@pi-amp.local:~/pi-neural-amp/results/ results/`
+Copy back to the laptop into its own folder, so Pi data never mixes with Mac test runs:
+`rsync -a <you>@pi-amp.local:~/pi-neural-amp/results/ results-pi/` (then point the README at `results-pi/`).
 
 ## 8. Live tuning with the Scarlett (after the offline runs)
 
