@@ -16,7 +16,8 @@ import os
 import struct
 import time
 
-RESULTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
+# RESULTS_DIR=results-pi reads a copy pulled from the Pi.
+RESULTS = os.environ.get("RESULTS_DIR") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
 
 
 def read_wav(path):

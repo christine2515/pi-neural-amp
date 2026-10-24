@@ -13,7 +13,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-RESULTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
+# RESULTS_DIR=results-pi reads a copy pulled from the Pi.
+RESULTS = os.environ.get("RESULTS_DIR") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
 CHARTS = os.path.join(RESULTS, "charts")
 
 

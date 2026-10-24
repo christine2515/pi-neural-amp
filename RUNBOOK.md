@@ -111,7 +111,7 @@ Disable afterwards: `sudo systemctl disable pi-neural-amp`.
     python3 scripts/plot.py --blocks results/blocks/baseline/<model>__128__r1.csv
 
 Copy back to the laptop into its own folder, so Pi data never mixes with Mac test runs:
-`rsync -a <you>@pi-amp.local:~/pi-neural-amp/results/ results-pi/` (then point the README at `results-pi/`).
+`rsync -a <you>@pi-amp.local:~/pi-neural-amp/results/ results-pi/` Then on the Mac: `RESULTS_DIR=results-pi python3 scripts/plot.py`.
 
 ## 8. Live tuning with the Scarlett (after the offline runs)
 
