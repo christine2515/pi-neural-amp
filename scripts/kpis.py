@@ -122,6 +122,26 @@ def smallest_block(kpis):
     return out
 
 
+def memory_self(summaries):
+    """Memory each bench run reported about itself (pss_kb, input_kb columns)."""
+    groups = defaultdict(list)
+    for r in summaries:
+        if r.get("pss_kb") not in (None, "", "-1"):
+            groups[(r["tag"], r["model"])].append(r)
+    out = []
+    for (tag, model), rs in sorted(groups.items()):
+        pss = [int(r["pss_kb"]) for r in rs]
+        inp = [int(r["input_kb"]) for r in rs]
+        out.append({
+            "tag": tag, "model": model, "runs": len(rs),
+            "pss_mb_max": max(pss) / 1024, "input_mb": max(inp) / 1024,
+            # what's left once the decoded input file is taken out: model + buffers + libraries
+            "pss_minus_input_mb": max(p - i for p, i in zip(pss, inp)) / 1024,
+            "peak_rss_mb": max(int(r["peak_rss_kb"]) for r in rs) / 1024,
+        })
+    return out
+
+
 def memory():
     out = []
     groups = defaultdict(list)
@@ -236,6 +256,7 @@ def live():
             "deadline_us": float(rs[0]["deadline_us"]),
             "cycle_jitter_p99_us": statistics.median(float(r["cycle_jitter_p99_us"]) for r in rs),
             "cpu_pct": statistics.median(float(r["cpu_pct"]) for r in rs),
+            "pss_mb": max((int(r.get("pss_kb") or -1) for r in rs), default=-1) / 1024,
         })
     best = defaultdict(list)
     for r in rows:
@@ -284,6 +305,11 @@ def main():
              "smallest_block_incl_wake", "blocks_tested"]
         write_csv(os.path.join(RESULTS, "kpi_smallest_block.csv"), sb, f)
         md += ["## Smallest glitch-free block", md_table(sb, f)]
+    mem_self = memory_self(load_summaries())
+    if mem_self:
+        f = list(mem_self[0].keys())
+        write_csv(os.path.join(RESULTS, "kpi_memory_self.csv"), mem_self, f)
+        md += ["## Memory (bench self-reported; input_mb is the decoded test file)", md_table(mem_self, f)]
     mem = memory()
     if mem:
         f = ["tag", "model", "runs", "peak_pss_mb", "median_pss_mb", "peak_rss_mb", "mean_cpu_pct"]

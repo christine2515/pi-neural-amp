@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 30-minute sustained run with thermal logging.
 # Usage: MODEL=models/x.nam BLOCK=128 ./scripts/sustained.sh
-# Env: DURATION=1800, IDLE=30, TAIL=60, INPUT=audio/di.wav, EXTRA="--rt" (optional), TAG=sustained
+# Env: DURATION=1800, IDLE=30, TAIL=60, MEM_SAMPLE=0 (1 = PSS time series), INPUT=audio/di.wav, EXTRA="--rt" (optional), TAG=sustained
 # Output: results/thermal_$TAG.csv, results/summary_$TAG.csv, results/blocks/$TAG/sustained.csv,
 #         results/mem/$TAG/sustained.csv
 set -euo pipefail
@@ -24,7 +24,7 @@ sleep "${IDLE:-30}"   # idle baseline before load
   --label "${TAG}__$(basename "$MODEL" .nam)__${BLOCK}" --summary-out "results/summary_${TAG}.csv" \
   --blocks-out "results/blocks/$TAG/sustained.csv" &
 pid=$!
-./scripts/mem_sampler.sh "$pid" "results/mem/$TAG/sustained.csv" 1 &
+[ "${MEM_SAMPLE:-0}" = 1 ] && ./scripts/mem_sampler.sh "$pid" "results/mem/$TAG/sustained.csv" 1 &
 wait "$pid"
 sleep "${TAIL:-60}"   # cool-down tail
 echo "done: results/thermal_${TAG}.csv"

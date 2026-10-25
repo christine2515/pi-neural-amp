@@ -10,7 +10,8 @@
 #   MODE=paced            paced (sleep to each deadline, like an audio callback) or burst (back to back)
 #   EXTRA=""              extra bench flags, e.g. "--rt --cpu 3"
 #   KEEP_BLOCKS=1         write per-block CSVs to results/blocks/$TAG/
-#   MEM_SAMPLE=1          run mem_sampler.sh alongside bench (0 = off, to check its overhead)
+#   MEM_SAMPLE=0          1 = also run mem_sampler.sh alongside bench (a PSS/CPU time series). Off by
+#                         default: bench records its own PSS, and the sampler may perturb timings.
 #
 # Example: TAG=baseline ./scripts/sweep.sh
 set -euo pipefail
@@ -61,7 +62,7 @@ for model in "${MODELS[@]}"; do
         "$BENCH" --model "$model" ${slim_args[@]+"${slim_args[@]}"} --input "$INPUT" --block "$block" \
           $MODE_FLAG $EXTRA --label "$label" --summary-out "$SUMMARY" ${blk_args[@]+"${blk_args[@]}"} &
         pid=$!
-        if [ "${MEM_SAMPLE:-1}" = 1 ] && [ -r /proc/$pid/smaps_rollup ]; then
+        if [ "${MEM_SAMPLE:-0}" = 1 ] && [ -r /proc/$pid/smaps_rollup ]; then
           ./scripts/mem_sampler.sh "$pid" "$MEMDIR/${mname}__${block}__r${rep}.csv" &
           spid=$!
         else

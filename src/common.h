@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -15,6 +16,7 @@
 #include <thread>
 #include <vector>
 
+#include <sys/resource.h>
 #include <sys/utsname.h>
 #include <unistd.h>
 
@@ -173,6 +175,48 @@ inline double Percentile(const std::vector<int64_t>& sorted, double p)
   size_t rank = static_cast<size_t>(std::ceil(p / 100.0 * sorted.size()));
   rank = std::clamp<size_t>(rank, 1, sorted.size());
   return static_cast<double>(sorted[rank - 1]);
+}
+
+// A field from /proc/self/smaps_rollup in kB (e.g. "Pss"), or -1 where unavailable (macOS).
+// Called after the audio loop: it reads a file.
+inline long SelfMemKb(const char* field)
+{
+  std::ifstream f("/proc/self/smaps_rollup");
+  const std::string key = std::string(field) + ":";
+  std::string line;
+  while (f && std::getline(f, line))
+    if (line.rfind(key, 0) == 0)
+      return std::strtol(line.c_str() + key.size(), nullptr, 10);
+  return -1;
+}
+
+// Peak resident set size of this process in kB (ru_maxrss is kB on Linux, bytes on macOS).
+inline long PeakRssKb()
+{
+  rusage ru{};
+  if (getrusage(RUSAGE_SELF, &ru) != 0)
+    return -1;
+#ifdef __APPLE__
+  return static_cast<long>(ru.ru_maxrss / 1024);
+#else
+  return static_cast<long>(ru.ru_maxrss);
+#endif
+}
+
+// True if `path` doesn't exist yet or starts with exactly `header`. Appending rows with new
+// columns under an old header would silently misalign every column, so callers refuse instead.
+inline bool CsvHeaderMatches(const std::string& path, const std::string& header)
+{
+  std::ifstream f(path);
+  if (!f)
+    return true;
+  std::string first;
+  std::getline(f, first);
+  if (first + "\n" == header)
+    return true;
+  std::cerr << path << " was written by an older version with different columns.\n"
+            << "Use a new --summary-out / TAG, or move the old file aside.\n";
+  return false;
 }
 
 inline void EnsureParentDir(const std::string& path)

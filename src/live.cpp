@@ -31,6 +31,13 @@ namespace
 volatile std::sig_atomic_t gStop = 0;
 void OnSignal(int) { gStop = 1; }
 
+// pss_kb / peak_rss_kb: the whole live process (model, ALSA buffers, libraries), read after the loop.
+const std::string kSummaryHeader =
+  "unix_time,host,label,device,mode,model,rate,period,periods,buffer_frames,io_buffer_ms,format,"
+  "in_channels,out_channels,seconds,periods_processed,xruns,proc_p50_us,proc_p99_us,proc_max_us,"
+  "deadline_us,cycle_jitter_p99_us,cycle_jitter_max_us,cpu_pct,rt,rt_prio,cpu,isolated_cpus,kernel,"
+  "pss_kb,peak_rss_kb\n";
+
 struct Args
 {
   std::string device = "hw:USB";
@@ -293,6 +300,8 @@ int main(int argc, char** argv)
     Usage();
     return 2;
   }
+  if (!CsvHeaderMatches(a.summaryOut, kSummaryHeader))
+    return 2;
   std::signal(SIGINT, OnSignal);
   std::signal(SIGTERM, OnSignal);
 
@@ -456,6 +465,8 @@ int main(int argc, char** argv)
   }
 
   const double wallS = std::chrono::duration<double>(Clock::now() - runStart).count();
+  const long pssKb = SelfMemKb("Pss"); // before closing the PCMs, so their buffers still count
+  const long peakRssKb = PeakRssKb();
   const double cpuPct = wallS > 0 ? 100.0 * (ProcessCpuSeconds() - cpu0) / wallS : 0.0;
   snd_pcm_drop(cap.h);
   snd_pcm_drop(pb.h);
@@ -483,9 +494,7 @@ int main(int argc, char** argv)
     const bool exists = std::filesystem::exists(a.summaryOut);
     std::ofstream f(a.summaryOut, std::ios::app);
     if (!exists)
-      f << "unix_time,host,label,device,mode,model,rate,period,periods,buffer_frames,io_buffer_ms,format,"
-           "in_channels,out_channels,seconds,periods_processed,xruns,proc_p50_us,proc_p99_us,proc_max_us,"
-           "deadline_us,cycle_jitter_p99_us,cycle_jitter_max_us,cpu_pct,rt,rt_prio,cpu,isolated_cpus,kernel\n";
+      f << kSummaryHeader;
     const char* mode = a.latencyTest ? "latency_test" : a.bypass ? "bypass" : "model";
     f << std::time(nullptr) << "," << Hostname() << "," << a.label << "," << a.device << "," << mode << ","
       << modelName << "," << a.rate << "," << N << "," << a.periods << "," << pb.buffer << "," << ioLatencyMs
@@ -494,7 +503,7 @@ int main(int argc, char** argv)
       << Percentile(proc, 99) / 1e3 << "," << (proc.empty() ? 0.0 : proc.back() / 1e3) << "," << deadlineUs
       << "," << Percentile(jitter, 99) / 1e3 << "," << (jitter.empty() ? 0.0 : jitter.back() / 1e3) << ","
       << cpuPct << "," << a.rt << "," << (a.rt ? a.rtPrio : 0) << "," << a.cpu << ",\"" << isolated << "\",\""
-      << KernelInfo() << "\"\n";
+      << KernelInfo() << "\"," << pssKb << "," << peakRssKb << "\n";
   }
 
   if (!a.periodsOut.empty())

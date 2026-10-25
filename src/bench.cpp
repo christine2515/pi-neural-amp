@@ -48,6 +48,15 @@ namespace
 {
 using namespace pna;
 
+// pss_kb / peak_rss_kb are read from the kernel after the loop. input_kb is the decoded input file
+// held in memory (and the render buffer, if any): subtract it to estimate what the model itself needs.
+const std::string kSummaryHeader =
+  "unix_time,host,label,model,block,sample_rate,deadline_us,measured_blocks,warmup_blocks,"
+  "p50_us,p90_us,p99_us,p999_us,max_us,mean_us,missed,missed_pct,"
+  "wake_p50_us,wake_p99_us,wake_max_us,missed_with_wake,dsp_load_pct,cpu_pct,"
+  "paced,rt,rt_prio,cpu,isolated_cpus,governor,kernel,load_ms,reset_ms,"
+  "pss_kb,peak_rss_kb,input_kb,build_flags\n";
+
 struct Args
 {
   std::string model;
@@ -181,6 +190,8 @@ int main(int argc, char** argv)
     Usage();
     return 2;
   }
+  if (!a.printSlimSizes && !CsvHeaderMatches(a.summaryOut, kSummaryHeader))
+    return 2;
 
   // ---- Load model (timed: part of "boot to ready") ----
   const auto tLoad0 = Clock::now();
@@ -363,6 +374,11 @@ int main(int argc, char** argv)
   if (a.slim >= 0.0)
     modelName += "@" + SlimVariantName(breakpoints, a.slim);
 
+  // Memory, read once the loop is done.
+  const long pssKb = SelfMemKb("Pss");
+  const long peakRssKb = PeakRssKb();
+  const size_t inputBytes = audio.size() * sizeof(float) + rendered.size() * sizeof(float);
+
   // ---- Outputs ----
   if (!a.blocksOut.empty())
   {
@@ -379,17 +395,14 @@ int main(int argc, char** argv)
     const bool exists = std::filesystem::exists(a.summaryOut);
     std::ofstream f(a.summaryOut, std::ios::app);
     if (!exists)
-      f << "unix_time,host,label,model,block,sample_rate,deadline_us,measured_blocks,warmup_blocks,"
-           "p50_us,p90_us,p99_us,p999_us,max_us,mean_us,missed,missed_pct,"
-           "wake_p50_us,wake_p99_us,wake_max_us,missed_with_wake,dsp_load_pct,cpu_pct,"
-           "paced,rt,rt_prio,cpu,isolated_cpus,governor,kernel,load_ms,reset_ms,build_flags\n";
+      f << kSummaryHeader;
     f << std::time(nullptr) << "," << Hostname() << "," << a.label << "," << modelName << "," << N << "," << sr
       << "," << deadlineUs << "," << measured.size() << "," << a.warmupBlocks << "," << p50 << "," << p90 << ","
       << p99 << "," << p999 << "," << maxUs << "," << meanUs << "," << missed << "," << missedPct << ","
       << wakeP50 << "," << wakeP99 << "," << wakeMax << "," << missedWithWake << "," << dspLoadPct << ","
       << cpuPct << "," << a.paced << "," << a.rt << "," << (a.rt ? a.rtPrio : 0) << "," << a.cpu << ",\""
-      << isolated << "\"," << governor << ",\"" << kernel << "\"," << loadMs << "," << resetMs << ",\""
-      << BENCH_BUILD_FLAGS << "\"\n";
+      << isolated << "\"," << governor << ",\"" << kernel << "\"," << loadMs << "," << resetMs << ","
+      << pssKb << "," << peakRssKb << "," << inputBytes / 1024 << ",\"" << BENCH_BUILD_FLAGS << "\"\n";
   }
 
   if (!a.firstBlockOut.empty() && bootAtLoopStart >= 0 && totalBlocks > 0)
