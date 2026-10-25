@@ -9,7 +9,8 @@ the analysis commands shown. Estimates are labeled as estimates.
 | | First baseline | Best so far | How |
 |---|---|---|---|
 | **Full**, block 128, p50 | 6,696 µs (251% load, misses every block) | **1,785 µs (67% load)** | NEON kernel (1.91×) + two-core pipeline (1.97×) = **3.75×** |
-| **Full**, smallest clean block (paced) | none | **128–256** samples (0 misses at 256; ~1 in 25,000 at 128) | + 1 block pipeline delay |
+| **Full**, smallest clean block (paced) | none | **128 samples**: 7 marginal overruns (≤35 µs) in 30 min, no stalls; 256 clean | + 1 block pipeline delay, `--rt` |
+| **Full**, 30 min sustained | — | p50 1,786 / p99 1,922 µs, flat; 44 °C peak, never throttled | |
 | **Lite**, block 128, p50 | 1,032 µs (39% load) | **849 µs (32%)** | ring mode 0 + NEON kernel (1.22×) |
 | **Lite**, smallest clean block (paced, `--rt`) | — | **32 samples (0.67 ms)**, or 16 pipelined (same total delay) | |
 | Memory (bench PSS minus test file) | ~4 MiB | — | measured, not optimized |
@@ -18,6 +19,11 @@ What didn't work, and why (measured): compiler auto-vectorization of Lite (−10
 clang's slow-VMLA model for the A7), Eigen `lazyProduct` for Full (−6%: weights reloaded per column).
 What explains everything: on the Cortex-A7, **every FP form peaks at ~1 float op per cycle**, so
 vectorization only pays by cutting non-arithmetic instructions, and the second core is the big lever.
+Measurement lesson: the memory sampler (+27% Lite p99) and the thermal logger (stalls up to 7 ms) were
+the biggest tail-latency sources found; both are now fixed (self-reported memory, fork-free logger).
+
+**Remaining items Claude can run:** clang VMLA flag on scalar code (R2-4), GCC 14 native build,
+head-conv vectorization (R2-7), int16 Full (R2-9, research).
 
 Waiting on Christine: core isolation (sudo + reboot), PREEMPT_RT kernel, Scarlett connected (live,
 mmap, round-trip latency), I2S hardware.
@@ -487,3 +493,26 @@ read only at start and exit (the "has occurred" bits are sticky, so the exit rea
 
 **The Python logger is indistinguishable from no logger.** The 30-minute run is repeated with it
 (run 3, below). The shell logger is removed from the repo.
+
+**Run 3** (`sustained_full_pipe3`): the same 30-minute configuration with `thermal_logger.py`.
+Chart: `results-pi/charts/sustained_full_pipe3.png`.
+
+| 30 min, Full pipelined, `--rt`, 128, paced | run 1 (vcgencmd logger) | run 2 (sysfs shell logger) | **run 3 (Python logger)** |
+|---|---|---|---|
+| blocks | 675,000 | 675,000 | 675,000 |
+| p50 / p99 (whole run) | 1,796 / 2,056 µs | 1,790 / 2,039 µs | **1,786 / 1,922 µs** |
+| compute overruns | 66 | 14 | **7** (each 0–35 µs over) |
+| stalls > 4 ms | 8 | 4 | **0** |
+| max block time | 7,279 µs | 7,093 µs | **2,702 µs** |
+| wake-ups > 1 ms / wake max | many / 5.1 ms | 741 in 10 min / 4.9 ms | **0 / 195 µs** |
+| late incl. catch-up | 3,027 | 2,352 | **7** |
+| temperature (idle → peak) | 38.5 → 44.9 °C | 37.9 → 44.9 °C | 39.0 → 44.4 °C |
+| throttle / capping / under-voltage | never | never | never (0x0 at start and exit) |
+
+**Verdict.** Over 30 minutes the pipelined Full model holds p50 1,784–1,789 µs and p99
+1,917–1,932 µs in every minute. There are no thermal effects; the Pi 2 plateaus at ~44 °C with two
+busy cores. What remains is 7 marginal overruns (≤35 µs over the 2,667 µs deadline, ~1 every
+4 minutes). With a third ALSA period they would most likely be absorbed by the extra buffer, but that is
+an inference until `live` runs on the Scarlett. Isolating cores 2–3 from the OS is the measured-next
+lever. **Lesson for the write-up:** two of the three biggest "tail latency problems" in this project
+were caused by the measurement tools (the memory sampler and the thermal logger), not the model.
