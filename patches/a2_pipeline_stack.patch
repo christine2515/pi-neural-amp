@@ -1,0 +1,58 @@
+--- a/NAM/wavenet/a2_fast.cpp	2026-10-25 15:27:22
++++ b/NAM/wavenet/a2_fast.cpp	2026-10-25 15:27:22
+@@ -242,8 +242,13 @@
+   ~A2FastModel() override
+   {
+     _stop.store(true, std::memory_order_release);
++  #if defined(__linux__)
++    if (_worker_started)
++      pthread_join(_worker, nullptr);
++  #else
+     if (_worker.joinable())
+       _worker.join();
++  #endif
+   }
+ 
+   void process(NAM_SAMPLE** input, NAM_SAMPLE** output, int num_frames) override;
+@@ -352,7 +357,21 @@
+   std::atomic<unsigned> _done{0}; // set to _job's value by the worker when stage B is finished
+   std::atomic<bool> _stop{false};
+   int _job_set = 0;
++  #if defined(__linux__)
++  // pthread with an explicit small stack: under mlockall(MCL_FUTURE) (bench/live --rt) a default
++  // std::thread stack (RLIMIT_STACK, 8 MB on Raspberry Pi OS) is locked into RAM in full.
++  pthread_t _worker{};
++  bool _worker_started = false;
++  int _worker_cpu = -1, _worker_prio = 0;
++  static void* _worker_entry(void* self)
++  {
++    auto* m = static_cast<A2FastModel*>(self);
++    m->_worker_main(m->_worker_cpu, m->_worker_prio);
++    return nullptr;
++  }
++  #else
+   std::thread _worker;
++  #endif
+   void _stage_a(const NAM_SAMPLE* in0, int num_frames);
+   void _stage_b();
+   void _worker_main(int cpu, int prio);
+@@ -439,7 +458,19 @@
+     const char* r = std::getenv("NAM_A2_PIPELINE_PRIO");
+     const int cpu = c ? std::atoi(c) : -1;
+     const int prio = r ? std::atoi(r) : 0;
++  #if defined(__linux__)
++    _worker_cpu = cpu;
++    _worker_prio = prio;
++    pthread_attr_t attr;
++    pthread_attr_init(&attr);
++    pthread_attr_setstacksize(&attr, 256 * 1024);
++    _worker_started = pthread_create(&_worker, &attr, &A2FastModel::_worker_entry, this) == 0;
++    pthread_attr_destroy(&attr);
++    if (!_worker_started)
++      throw std::runtime_error("A2FastModel: could not start pipeline worker thread");
++  #else
+     _worker = std::thread([this, cpu, prio] { _worker_main(cpu, prio); });
++  #endif
+   }
+ }
+ 
