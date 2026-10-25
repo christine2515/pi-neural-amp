@@ -18,6 +18,7 @@ number or moment from the project that showed it. For the full experimental reco
 | 8 | [08-build-and-tooling.md](08-build-and-tooling.md) | Cross-compiling, CMake, patches, the remote workflow, rsync/SSH pitfalls |
 | 9 | [09-open-questions-and-next-steps.md](09-open-questions-and-next-steps.md) | What's left, plus self-test questions with answers |
 | 10 | [10-wavenet-explained.md](10-wavenet-explained.md) | Deep dive after 2: one sample through the A2 WaveNet, with shapes, a worked example, figures, and real-audio activations |
+| 11 | [11-electric-guitars-and-hum.md](11-electric-guitars-and-hum.md) | How pickups work, why a Strat hums, the hum diagnosis, noise gates |
 
 ## Cheat sheet: the 20 things to remember
 
