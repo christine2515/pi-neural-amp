@@ -31,7 +31,7 @@ def save(fig, name):
     fig.tight_layout()
     fig.savefig(os.path.join(CHARTS, name), dpi=150)
     plt.close(fig)
-    print("wrote", os.path.join("results", "charts", name))
+    print("wrote", os.path.join(CHARTS, name))
 
 
 def plot_budget(kpis):
