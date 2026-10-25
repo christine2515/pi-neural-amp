@@ -273,6 +273,57 @@ inline bool WriteWavFloat(const std::string& path, const float* samples, size_t 
   return out.good();
 }
 
+// Noise gate for the model input: mutes signal below a threshold so pickup hum isn't amplified in
+// silence. Peak envelope (instant attack, ~50 ms decay), opens above `open_db`, closes when the
+// envelope stays below `open_db - hysteresis_db` for `hold_ms`, and ramps its gain (1 ms open,
+// `release_ms` close) so it never clicks. No allocation, no branches on the audio data beyond compares.
+struct NoiseGate
+{
+  bool enabled = false;
+  float open_lin = 0.0f, close_lin = 0.0f;
+  float env = 0.0f, env_decay = 0.0f;
+  float gain = 0.0f, attack_step = 0.0f, release_coef = 0.0f;
+  int hold = 0, hold_left = 0;
+  bool open = false;
+
+  void Configure(float open_db, float hysteresis_db, float hold_ms, float release_ms, float sr)
+  {
+    enabled = true;
+    open_lin = std::pow(10.0f, open_db / 20.0f);
+    close_lin = std::pow(10.0f, (open_db - hysteresis_db) / 20.0f);
+    env_decay = std::exp(-1.0f / (0.050f * sr));
+    attack_step = 1.0f / (0.001f * sr);
+    release_coef = std::exp(-1.0f / (release_ms * 0.001f * sr));
+    hold = static_cast<int>(hold_ms * 0.001f * sr);
+  }
+
+  template <typename T>
+  void Process(T* x, int n)
+  {
+    if (!enabled)
+      return;
+    for (int i = 0; i < n; i++)
+    {
+      const float a = std::fabs(static_cast<float>(x[i]));
+      env = a > env ? a : env * env_decay;
+      if (env >= open_lin)
+      {
+        open = true;
+        hold_left = hold;
+      }
+      else if (env < close_lin)
+      {
+        if (hold_left > 0)
+          hold_left--;
+        else
+          open = false;
+      }
+      gain = open ? std::min(1.0f, gain + attack_step) : gain * release_coef;
+      x[i] = static_cast<T>(static_cast<float>(x[i]) * gain);
+    }
+  }
+};
+
 inline void EnsureParentDir(const std::string& path)
 {
   const auto parent = std::filesystem::path(path).parent_path();

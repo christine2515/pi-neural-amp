@@ -67,6 +67,8 @@ struct Args
   std::string latencyOut = "results/live_latency.csv";
   std::string periodsOut; // per-period CSV; empty = skip
   std::string recordOut;  // stereo WAV: left = dry input, right = model output; empty = skip
+  double gateDb = 0.0;    // noise gate open threshold in dBFS (e.g. -50); 0 = off
+  double gateHoldMs = 80.0, gateReleaseMs = 100.0;
   bool mmap = false;       // MMAP_INTERLEAVED access instead of RW_INTERLEAVED
   std::string pipeline;    // A2 two-core pipeline spec ("8", "3", "all"); needs the a2_pipeline patch
   int pipelineCpu = -1;    // worker core; default 2 when --cpu 3
@@ -91,7 +93,9 @@ void Usage()
                "  --summary-out F.csv  (default results/live_summary.csv)\n"
                "  --latency-out F.csv  (default results/live_latency.csv)\n"
                "  --periods-out F.csv  per-period timings\n"
-               "  --record F.wav       save dry input (left) and output (right) as a float WAV\n"
+               "  --record F.wav       save dry input (left, before the gate) and output (right) as a float WAV\n"
+               "  --gate DB            noise gate before the model, opens above DB dBFS (e.g. -50); 4 dB hysteresis\n"
+               "  --gate-hold MS / --gate-release MS   (defaults 80 / 100)\n"
                "  --mmap               ALSA mmap access (snd_pcm_mmap_readi/writei) instead of read/write\n"
                "  --pipeline C         two-core A2 pipeline (8 = Full, 3 = Lite); adds one period of latency\n"
                "  --pipeline-cpu N     worker core (default 2 with --cpu 3)\n"
@@ -145,6 +149,12 @@ bool ParseArgs(int argc, char** argv, Args& a)
       a.summaryOut = next("--summary-out");
     else if (s == "--latency-out")
       a.latencyOut = next("--latency-out");
+    else if (s == "--gate")
+      a.gateDb = std::atof(next("--gate"));
+    else if (s == "--gate-hold")
+      a.gateHoldMs = std::atof(next("--gate-hold"));
+    else if (s == "--gate-release")
+      a.gateReleaseMs = std::atof(next("--gate-release"));
     else if (s == "--record")
       a.recordOut = next("--record");
     else if (s == "--mmap")
@@ -424,11 +434,17 @@ int main(int argc, char** argv)
   std::vector<int64_t> procNs(maxPeriods, 0), cycleNs(maxPeriods, 0);
   // Recording buffer, preallocated for the whole run (interleaved dry/out), filled per good period.
   std::vector<float> rec(a.recordOut.empty() ? 0 : maxPeriods * N * 2, 0.0f);
+  std::vector<NAM_SAMPLE> rawIn(N, 0);
   std::vector<uint32_t> xrunAt(1024, 0);
   // Latency test: emission frame of the current click, and measured round trips.
   const int64_t clickEvery = a.rate / 2, clickLen = 16;
   std::vector<int64_t> roundTrips(static_cast<size_t>(a.durationSec * 2) + 4, 0);
   size_t nRoundTrips = 0;
+
+  NoiseGate gate;
+  if (a.gateDb < 0.0)
+    gate.Configure(static_cast<float>(a.gateDb), 4.0f, static_cast<float>(a.gateHoldMs),
+                   static_cast<float>(a.gateReleaseMs), static_cast<float>(a.rate));
 
   if (a.rt)
   {
@@ -459,6 +475,10 @@ int main(int argc, char** argv)
     {
       for (int i = 0; i < N; i++)
         inBuf[i] = static_cast<NAM_SAMPLE>(ReadSample(inRaw.data(), cap, i, a.inChannel));
+      if (!rec.empty())
+        std::copy(inBuf.begin(), inBuf.end(), rawIn.begin()); // record the ungated input
+      if (!a.latencyTest)
+        gate.Process(inBuf.data(), N);
 
       if (a.latencyTest)
       {
@@ -522,7 +542,7 @@ int main(int argc, char** argv)
       float* r = rec.data() + nPeriods * static_cast<size_t>(N) * 2;
       for (int i = 0; i < N; i++)
       {
-        r[2 * i] = static_cast<float>(inBuf[i]);
+        r[2 * i] = static_cast<float>(rawIn[i]);
         r[2 * i + 1] = static_cast<float>(outBuf[i]);
       }
     }
