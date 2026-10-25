@@ -5,7 +5,7 @@
 # Turn Direct Monitor off, set the input gain low and output volume moderate. Unplug the guitar.
 #
 # Env: DEVICE=hw:USB, IN_CHANNEL=0, PERIOD_SIZES="32 64 128 256", PERIOD_COUNTS="2 3",
-#      DURATION=10, EXTRA="" (e.g. "--rt --cpu 3"), TAG=latency
+#      DURATION=10, EXTRA="" (e.g. "--rt --cpu 3", "--mmap"), TAG=latency, LIVE=./build/live
 # Output: results/live_latency.csv (one row per click), results/live_summary.csv
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -18,11 +18,12 @@ PERIOD_COUNTS=${PERIOD_COUNTS:-"2 3"}
 DURATION=${DURATION:-10}
 EXTRA=${EXTRA:-}
 
-[ -x ./build/live ] || { echo "missing ./build/live"; exit 1; }
+LIVE=${LIVE:-./build/live}
+[ -x "$LIVE" ] || { echo "missing $LIVE"; exit 1; }
 for n in $PERIOD_COUNTS; do
   for p in $PERIOD_SIZES; do
     # shellcheck disable=SC2086
-    ./build/live --latency-test --device "$DEVICE" --in-channel "$IN_CHANNEL" --period "$p" --periods "$n" \
+    "$LIVE" --latency-test --device "$DEVICE" --in-channel "$IN_CHANNEL" --period "$p" --periods "$n" \
       --duration "$DURATION" $EXTRA --label "${TAG}__${p}x${n}" || echo "failed: ${p}x${n}"
     sleep 1
   done

@@ -24,6 +24,10 @@
 #include "NAM/slimmable.h"
 #include "common.h"
 
+#ifndef BENCH_BUILD_FLAGS
+  #define BENCH_BUILD_FLAGS "unknown"
+#endif
+
 using namespace pna;
 
 namespace
@@ -31,12 +35,16 @@ namespace
 volatile std::sig_atomic_t gStop = 0;
 void OnSignal(int) { gStop = 1; }
 
+// Read/write entry points: plain RW access or mmap access (same signatures).
+snd_pcm_sframes_t (*gReadi)(snd_pcm_t*, void*, snd_pcm_uframes_t) = snd_pcm_readi;
+snd_pcm_sframes_t (*gWritei)(snd_pcm_t*, const void*, snd_pcm_uframes_t) = snd_pcm_writei;
+
 // pss_kb / peak_rss_kb: the whole live process (model, ALSA buffers, libraries), read after the loop.
 const std::string kSummaryHeader =
   "unix_time,host,label,device,mode,model,rate,period,periods,buffer_frames,io_buffer_ms,format,"
   "in_channels,out_channels,seconds,periods_processed,xruns,proc_p50_us,proc_p99_us,proc_max_us,"
   "deadline_us,cycle_jitter_p99_us,cycle_jitter_max_us,cpu_pct,rt,rt_prio,cpu,isolated_cpus,kernel,"
-  "pss_kb,peak_rss_kb\n";
+  "pss_kb,peak_rss_kb,access,pipeline,build_flags\n";
 
 struct Args
 {
@@ -58,6 +66,10 @@ struct Args
   std::string summaryOut = "results/live_summary.csv";
   std::string latencyOut = "results/live_latency.csv";
   std::string periodsOut; // per-period CSV; empty = skip
+  bool mmap = false;       // MMAP_INTERLEAVED access instead of RW_INTERLEAVED
+  std::string pipeline;    // A2 two-core pipeline spec ("8", "3", "all"); needs the a2_pipeline patch
+  int pipelineCpu = -1;    // worker core; default 2 when --cpu 3
+  int pipelineSplit = 0;
 };
 
 void Usage()
@@ -77,7 +89,11 @@ void Usage()
                "  --label L\n"
                "  --summary-out F.csv  (default results/live_summary.csv)\n"
                "  --latency-out F.csv  (default results/live_latency.csv)\n"
-               "  --periods-out F.csv  per-period timings\n";
+               "  --periods-out F.csv  per-period timings\n"
+               "  --mmap               ALSA mmap access (snd_pcm_mmap_readi/writei) instead of read/write\n"
+               "  --pipeline C         two-core A2 pipeline (8 = Full, 3 = Lite); adds one period of latency\n"
+               "  --pipeline-cpu N     worker core (default 2 with --cpu 3)\n"
+               "  --pipeline-split L   first layer run by the worker\n";
 }
 
 bool ParseArgs(int argc, char** argv, Args& a)
@@ -127,6 +143,14 @@ bool ParseArgs(int argc, char** argv, Args& a)
       a.summaryOut = next("--summary-out");
     else if (s == "--latency-out")
       a.latencyOut = next("--latency-out");
+    else if (s == "--mmap")
+      a.mmap = true;
+    else if (s == "--pipeline")
+      a.pipeline = next("--pipeline");
+    else if (s == "--pipeline-cpu")
+      a.pipelineCpu = std::atoi(next("--pipeline-cpu"));
+    else if (s == "--pipeline-split")
+      a.pipelineSplit = std::atoi(next("--pipeline-split"));
     else if (s == "--periods-out")
       a.periodsOut = next("--periods-out");
     else if (s == "-h" || s == "--help")
@@ -177,7 +201,9 @@ bool OpenPcm(Pcm& p, const Args& a, snd_pcm_stream_t stream)
   snd_pcm_hw_params_alloca(&hw);
   snd_pcm_hw_params_any(p.h, hw);
   if (!Check(snd_pcm_hw_params_set_rate_resample(p.h, hw, 0), "disable resampling") ||
-      !Check(snd_pcm_hw_params_set_access(p.h, hw, SND_PCM_ACCESS_RW_INTERLEAVED), "set access"))
+      !Check(snd_pcm_hw_params_set_access(
+               p.h, hw, a.mmap ? SND_PCM_ACCESS_MMAP_INTERLEAVED : SND_PCM_ACCESS_RW_INTERLEAVED),
+             "set access"))
     return false;
 
   // Scarlett 3rd/4th gen use S32_LE; 2nd gen uses S24_3LE.
@@ -279,6 +305,9 @@ inline void WriteSample(uint8_t* buf, const Pcm& p, size_t frame, unsigned ch, f
 }
 
 // (Re)start the linked streams: prepare, pre-fill playback with silence, start.
+// Linked streams start together; if the device can't link them (e.g. ALSA's "null" PCM), start both.
+bool gLinked = true;
+
 bool StartStreams(Pcm& cap, Pcm& pb, std::vector<uint8_t>& silence)
 {
   snd_pcm_drop(cap.h);
@@ -286,8 +315,10 @@ bool StartStreams(Pcm& cap, Pcm& pb, std::vector<uint8_t>& silence)
   if (!Check(snd_pcm_prepare(cap.h), "prepare capture") || !Check(snd_pcm_prepare(pb.h), "prepare playback"))
     return false;
   for (snd_pcm_uframes_t done = 0; done < pb.buffer; done += pb.period)
-    if (!Check(static_cast<int>(snd_pcm_writei(pb.h, silence.data(), pb.period)), "pre-fill playback"))
+    if (!Check(static_cast<int>(gWritei(pb.h, silence.data(), pb.period)), "pre-fill playback"))
       return false;
+  if (!gLinked && !Check(snd_pcm_start(pb.h), "start playback"))
+    return false;
   return Check(snd_pcm_start(cap.h), "start");
 }
 } // namespace
@@ -302,6 +333,19 @@ int main(int argc, char** argv)
   }
   if (!CsvHeaderMatches(a.summaryOut, kSummaryHeader))
     return 2;
+  if (a.mmap)
+  {
+    gReadi = snd_pcm_mmap_readi;
+    gWritei = snd_pcm_mmap_writei;
+  }
+  // The pipeline worker starts when the model is constructed, so configure it first.
+  if (!a.pipeline.empty())
+  {
+    if (a.pipelineCpu < 0 && a.cpu == 3)
+      a.pipelineCpu = 2;
+    if (!ConfigureA2Pipeline(a.pipeline, a.pipelineCpu, a.pipelineSplit, a.rt ? a.rtPrio : 0, BENCH_BUILD_FLAGS))
+      return 2;
+  }
   std::signal(SIGINT, OnSignal);
   std::signal(SIGTERM, OnSignal);
 
@@ -335,6 +379,9 @@ int main(int argc, char** argv)
       model->Reset(a.rate, a.period);
       modelName += "@" + SlimVariantName(slimmable->GetSlimmableSizeBreakpoints(), a.slim);
     }
+    const auto at = modelName.rfind('@');
+    if (PipelineApplies(a.pipeline, at == std::string::npos ? std::string() : modelName.substr(at + 1)))
+      modelName += "+pipe" + (a.pipelineSplit > 0 ? std::to_string(a.pipelineSplit) : std::string());
   }
 
   // ---- ALSA ----
@@ -352,8 +399,11 @@ int main(int argc, char** argv)
     std::cerr << "--in-channel " << a.inChannel << " out of range (device has " << cap.channels << ")\n";
     return 1;
   }
-  if (!Check(snd_pcm_link(cap.h, pb.h), "link capture+playback"))
-    return 1;
+  if (const int err = snd_pcm_link(cap.h, pb.h); err < 0)
+  {
+    std::cerr << "note: can't link capture+playback (" << snd_strerror(err) << "); starting them separately\n";
+    gLinked = false;
+  }
   const int N = a.period;
   std::fprintf(stderr, "device %s: %d Hz, period %d x %d (%lu frames buffer), %s, in %u ch / out %u ch\n",
                a.device.c_str(), a.rate, N, a.periods, static_cast<unsigned long>(pb.buffer),
@@ -397,7 +447,7 @@ int main(int argc, char** argv)
   // ---- Audio loop ----
   while (!gStop && nPeriods < maxPeriods - 1)
   {
-    snd_pcm_sframes_t r = snd_pcm_readi(cap.h, inRaw.data(), N);
+    snd_pcm_sframes_t r = gReadi(cap.h, inRaw.data(), N);
     const auto tRead = Clock::now();
     if (r == N)
     {
@@ -440,7 +490,7 @@ int main(int argc, char** argv)
       for (int i = 0; i < N; i++)
         for (unsigned ch = 0; ch < pb.channels; ch++)
           WriteSample(outRaw.data(), pb, i, ch, static_cast<float>(outBuf[i]));
-      r = snd_pcm_writei(pb.h, outRaw.data(), N);
+      r = gWritei(pb.h, outRaw.data(), N);
     }
 
     if (r != N)
@@ -470,7 +520,8 @@ int main(int argc, char** argv)
   const double cpuPct = wallS > 0 ? 100.0 * (ProcessCpuSeconds() - cpu0) / wallS : 0.0;
   snd_pcm_drop(cap.h);
   snd_pcm_drop(pb.h);
-  snd_pcm_unlink(cap.h);
+  if (gLinked)
+    snd_pcm_unlink(cap.h);
   snd_pcm_close(cap.h);
   snd_pcm_close(pb.h);
 
@@ -503,7 +554,8 @@ int main(int argc, char** argv)
       << Percentile(proc, 99) / 1e3 << "," << (proc.empty() ? 0.0 : proc.back() / 1e3) << "," << deadlineUs
       << "," << Percentile(jitter, 99) / 1e3 << "," << (jitter.empty() ? 0.0 : jitter.back() / 1e3) << ","
       << cpuPct << "," << a.rt << "," << (a.rt ? a.rtPrio : 0) << "," << a.cpu << ",\"" << isolated << "\",\""
-      << KernelInfo() << "\"," << pssKb << "," << peakRssKb << "\n";
+      << KernelInfo() << "\"," << pssKb << "," << peakRssKb << "," << (a.mmap ? "mmap" : "rw") << ","
+      << (a.pipeline.empty() ? "none" : a.pipeline) << ",\"" << BENCH_BUILD_FLAGS << "\"\n";
   }
 
   if (!a.periodsOut.empty())

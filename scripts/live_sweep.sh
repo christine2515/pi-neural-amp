@@ -10,7 +10,8 @@
 #   PERIOD_SIZES="32 64 128 256"
 #   PERIOD_COUNTS="2 3"
 #   DURATION=20              seconds per configuration
-#   EXTRA=""                 e.g. "--rt --cpu 3"
+#   EXTRA=""                 e.g. "--rt --cpu 3", "--mmap", "--pipeline 8" (Full) — applied to every run
+#   SLIM="lite"              only these A2 submodels (lite/full); default all
 #   BYPASS=1                 also run each configuration with no model (interface baseline)
 #
 # Example: EXTRA="--rt --cpu 3" TAG=live_rt ./scripts/live_sweep.sh
@@ -27,13 +28,14 @@ DURATION=${DURATION:-20}
 EXTRA=${EXTRA:-}
 BYPASS=${BYPASS:-1}
 
-[ -x ./build/live ] || { echo "missing ./build/live (sudo apt install libasound2-dev, then rebuild)"; exit 1; }
+LIVE=${LIVE:-./build/live}
+[ -x "$LIVE" ] || { echo "missing $LIVE"; exit 1; }
 shopt -s nullglob
 
 run() {  # run <label> <live args...>
   local label=$1; shift
   # shellcheck disable=SC2086
-  ./build/live --device "$DEVICE" --in-channel "$IN_CHANNEL" --duration "$DURATION" $EXTRA \
+  "$LIVE" --device "$DEVICE" --in-channel "$IN_CHANNEL" --duration "$DURATION" $EXTRA \
     --label "$label" "$@" || echo "live failed: $label"
   sleep 1
 }
@@ -42,9 +44,10 @@ for n in $PERIOD_COUNTS; do
   for p in $PERIOD_SIZES; do
     [ "$BYPASS" = 1 ] && run "${TAG}__bypass__${p}x${n}" --bypass --period "$p" --periods "$n"
     for model in "$MODELS_DIR"/*.nam; do
-      variants=$(./build/bench --model "$model" --print-slim-sizes)
+      variants=$("${BENCH:-./build/bench}" --model "$model" --print-slim-sizes)
       [ -n "$variants" ] || variants="- -"
       while read -r slim vname <&3; do
+        if [ -n "${SLIM:-}" ] && [[ " $SLIM " != *" $vname "* ]]; then continue; fi
         mname=$(basename "$model" .nam)
         slim_args=()
         if [ "$slim" != "-" ]; then

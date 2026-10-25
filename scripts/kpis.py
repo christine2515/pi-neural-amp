@@ -259,6 +259,7 @@ def live():
             "cycle_jitter_p99_us": statistics.median(float(r["cycle_jitter_p99_us"]) for r in rs),
             "cpu_pct": statistics.median(float(r["cpu_pct"]) for r in rs),
             "pss_mb": max((int(r.get("pss_kb") or -1) for r in rs), default=-1) / 1024,
+            "access": rs[0].get("access", "rw"), "pipeline": rs[0].get("pipeline", "none"),
         })
     best = defaultdict(list)
     for r in rows:

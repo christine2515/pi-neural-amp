@@ -209,18 +209,10 @@ int main(int argc, char** argv)
   // The pipeline worker starts when the model is constructed, so configure it first.
   if (!a.pipeline.empty())
   {
-    if (std::strstr(BENCH_BUILD_FLAGS, "a2_pipeline") == nullptr)
-    {
-      std::cerr << "--pipeline needs a build with patches/a2_pipeline.patch\n";
-      return 2;
-    }
     if (a.pipelineCpu < 0 && a.cpu == 3)
       a.pipelineCpu = 2;
-    setenv("NAM_A2_PIPELINE", a.pipeline.c_str(), 1);
-    setenv("NAM_A2_PIPELINE_CPU", std::to_string(a.pipelineCpu).c_str(), 1);
-    setenv("NAM_A2_PIPELINE_PRIO", std::to_string(a.rt ? a.rtPrio : 0).c_str(), 1);
-    if (a.pipelineSplit > 0)
-      setenv("NAM_A2_PIPELINE_SPLIT", std::to_string(a.pipelineSplit).c_str(), 1);
+    if (!ConfigureA2Pipeline(a.pipeline, a.pipelineCpu, a.pipelineSplit, a.rt ? a.rtPrio : 0, BENCH_BUILD_FLAGS))
+      return 2;
   }
 
   // ---- Load model (timed: part of "boot to ready") ----
@@ -401,9 +393,10 @@ int main(int argc, char** argv)
   const double loadMs = std::chrono::duration<double, std::milli>(tLoad1 - tLoad0).count();
   const double resetMs = std::chrono::duration<double, std::milli>(tReset1 - tReset0).count();
   std::string modelName = std::filesystem::path(a.model).filename().string();
+  const std::string variant = a.slim >= 0.0 ? SlimVariantName(breakpoints, a.slim) : std::string();
   if (a.slim >= 0.0)
-    modelName += "@" + SlimVariantName(breakpoints, a.slim);
-  if (!a.pipeline.empty())
+    modelName += "@" + variant;
+  if (PipelineApplies(a.pipeline, variant))
     modelName += "+pipe" + (a.pipelineSplit > 0 ? std::to_string(a.pipelineSplit) : std::string());
 
   // Memory, read once the loop is done.

@@ -219,6 +219,35 @@ inline bool CsvHeaderMatches(const std::string& path, const std::string& header)
   return false;
 }
 
+// Configure the A2 two-core pipeline (patches/a2_pipeline.patch) through the environment it reads at
+// model construction. Call before nam::get_dsp. spec: "8" (Full), "3" (Lite), "all". Returns false
+// (and says why) if this binary wasn't built with the patch, so a run is never mislabeled as pipelined.
+inline bool ConfigureA2Pipeline(const std::string& spec, int cpu, int split, int prio, const char* buildFlags)
+{
+  if (std::string(buildFlags).find("a2_pipeline") == std::string::npos)
+  {
+    std::cerr << "--pipeline needs a build with patches/a2_pipeline.patch\n";
+    return false;
+  }
+  setenv("NAM_A2_PIPELINE", spec.c_str(), 1);
+  setenv("NAM_A2_PIPELINE_CPU", std::to_string(cpu).c_str(), 1);
+  setenv("NAM_A2_PIPELINE_PRIO", std::to_string(prio).c_str(), 1);
+  if (split > 0)
+    setenv("NAM_A2_PIPELINE_SPLIT", std::to_string(split).c_str(), 1);
+  return true;
+}
+
+// Whether a pipeline spec applies to an A2 submodel ("lite" = 3 channels, "full" = 8). Used for labels.
+inline bool PipelineApplies(const std::string& spec, const std::string& variant)
+{
+  if (spec.empty())
+    return false;
+  if (spec == "all" || spec == "1")
+    return true;
+  return (variant == "full" && spec.find('8') != std::string::npos)
+         || (variant == "lite" && spec.find('3') != std::string::npos);
+}
+
 inline void EnsureParentDir(const std::string& path)
 {
   const auto parent = std::filesystem::path(path).parent_path();

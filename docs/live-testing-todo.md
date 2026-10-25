@@ -7,15 +7,20 @@ round-trip latency, and the Reddit OS/audio ideas (mmap, isolcpus, periods).
 **Who:** 🧑 = Christine (hardware, sudo, reboot, ears) · 🤖 = Claude (code, deploys, runs, analysis).
 Everything writes CSV to `results/`; analysis goes into `docs/experiment-report.md` (new "Live" section).
 
-## 0. Code prep (before the hardware session)
-- [ ] 🤖 `live --pipeline 8|3 [--pipeline-cpu N] [--pipeline-split L]`: same as `bench` (sets the
-      `NAM_A2_PIPELINE*` env before loading; worker gets the same SCHED_FIFO priority under `--rt`).
-- [ ] 🤖 `live --mmap`: `SND_PCM_ACCESS_MMAP_INTERLEAVED` + `snd_pcm_mmap_readi/writei`, same loop, recorded
-      in the summary row.
-- [ ] 🤖 `live` summary: add `access` (rw/mmap) and `pipeline` columns. The header guard means a new
-      `live_summary` file.
-- [ ] 🤖 Extend `live_sweep.sh` / `latency_test.sh` with `EXTRA`, `MODELS` filters and `SLIM`, like `sweep.sh`.
-- [ ] 🤖 Cross-build `nhead` with the new `live`, deploy to the Pi's `build/`, syntax-check, commit.
+## 0. Code prep (before the hardware session) ✅ done 2026-10-25
+- [x] 🤖 `live --pipeline 8|3 [--pipeline-cpu N] [--pipeline-split L]` (shared `ConfigureA2Pipeline` with `bench`;
+      worker gets the same SCHED_FIFO priority under `--rt`; label `+pipe` only when it applies to the submodel).
+- [x] 🤖 `live --mmap` (`SND_PCM_ACCESS_MMAP_INTERLEAVED`, `snd_pcm_mmap_readi/writei`).
+- [x] 🤖 `live` summary: new `access`, `pipeline`, `build_flags` columns (new header, so a new `live_summary.csv`).
+- [x] 🤖 `live_sweep.sh`: `SLIM=` filter, `LIVE=`/`BENCH=` overrides; `latency_test.sh`: `LIVE=`; KPI table shows access + pipeline.
+- [x] 🤖 `live` no longer fails on devices that can't link capture/playback (starts both streams instead).
+- [x] 🤖 `nhead` (`build-armhf-nhead`) deployed to the Pi's `build/` (`bench` + `live`).
+- [x] 🤖 Smoke test on ALSA's `null` device (no real timing): bypass, `--mmap`, Full `--pipeline 8 --rt`,
+      Lite `--mmap --rt`, `--latency-test`. All run with 0 xruns; process times match `bench`
+      (Full pipelined p50 1,763 µs, Lite 844 µs).
+- [ ] 🤖 **Found:** with `--rt`, pipelined Full's PSS is 13.8 MB vs 5.6 MB for Lite. Likely cause: `mlockall`
+      locks the worker thread's whole default stack (`ulimit -s` = 8 MB). Fix: create the worker with a
+      small explicit stack (pthread attr in `a2_pipeline.patch`), then re-measure. Fix before quoting memory.
 
 ## 1. Hardware setup 🧑
 - [ ] Plug the Scarlett into the Pi's USB. If it crackles or drops out, use a powered USB hub.
@@ -50,8 +55,8 @@ Each arm runs the period sizes (32/64/128/256) × periods (2/3) for 20–60 s; o
 and `live_smallest_buffer.csv`.
 - [ ] Lite, plain
 - [ ] Lite, `--rt --cpu 3`
-- [ ] Lite, `--rt` + `--mmap` (**Reddit: ALSA mmap**)
-- [ ] Full, `--pipeline 8 --rt --cpu 3`
+- [ ] Lite, `--rt` + `--mmap` (**Reddit: ALSA mmap**): `SLIM=lite EXTRA="--rt --cpu 3 --mmap" TAG=live_lite_mmap ./scripts/live_sweep.sh`
+- [ ] Full, `--pipeline 8 --rt --cpu 3`: `SLIM=full EXTRA="--pipeline 8 --rt --cpu 3" TAG=live_full_pipe ./scripts/live_sweep.sh`
 - [ ] Full, pipelined + `--mmap`
 - [ ] Compare: offline smallest clean block vs live smallest xrun-free buffer. The gap is driver + USB cost.
 
