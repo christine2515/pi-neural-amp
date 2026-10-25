@@ -248,6 +248,31 @@ inline bool PipelineApplies(const std::string& spec, const std::string& variant)
          || (variant == "lite" && spec.find('3') != std::string::npos);
 }
 
+// Interleaved 32-bit float WAV (IEEE format 3). Not real-time safe: call after the audio loop.
+inline bool WriteWavFloat(const std::string& path, const float* samples, size_t frames, int channels, uint32_t sr)
+{
+  std::ofstream out(path, std::ios::binary);
+  if (!out)
+    return false;
+  const uint32_t dataSize = static_cast<uint32_t>(frames * channels * sizeof(float));
+  const uint32_t riffSize = 36 + dataSize, fmtSize = 16, byteRate = sr * channels * 4;
+  const uint16_t fmt = 3, ch = static_cast<uint16_t>(channels), align = static_cast<uint16_t>(4 * channels), bits = 32;
+  out.write("RIFF", 4);
+  out.write(reinterpret_cast<const char*>(&riffSize), 4);
+  out.write("WAVEfmt ", 8);
+  out.write(reinterpret_cast<const char*>(&fmtSize), 4);
+  out.write(reinterpret_cast<const char*>(&fmt), 2);
+  out.write(reinterpret_cast<const char*>(&ch), 2);
+  out.write(reinterpret_cast<const char*>(&sr), 4);
+  out.write(reinterpret_cast<const char*>(&byteRate), 4);
+  out.write(reinterpret_cast<const char*>(&align), 2);
+  out.write(reinterpret_cast<const char*>(&bits), 2);
+  out.write("data", 4);
+  out.write(reinterpret_cast<const char*>(&dataSize), 4);
+  out.write(reinterpret_cast<const char*>(samples), dataSize);
+  return out.good();
+}
+
 inline void EnsureParentDir(const std::string& path)
 {
   const auto parent = std::filesystem::path(path).parent_path();

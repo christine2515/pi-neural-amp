@@ -66,6 +66,7 @@ struct Args
   std::string summaryOut = "results/live_summary.csv";
   std::string latencyOut = "results/live_latency.csv";
   std::string periodsOut; // per-period CSV; empty = skip
+  std::string recordOut;  // stereo WAV: left = dry input, right = model output; empty = skip
   bool mmap = false;       // MMAP_INTERLEAVED access instead of RW_INTERLEAVED
   std::string pipeline;    // A2 two-core pipeline spec ("8", "3", "all"); needs the a2_pipeline patch
   int pipelineCpu = -1;    // worker core; default 2 when --cpu 3
@@ -90,6 +91,7 @@ void Usage()
                "  --summary-out F.csv  (default results/live_summary.csv)\n"
                "  --latency-out F.csv  (default results/live_latency.csv)\n"
                "  --periods-out F.csv  per-period timings\n"
+               "  --record F.wav       save dry input (left) and output (right) as a float WAV\n"
                "  --mmap               ALSA mmap access (snd_pcm_mmap_readi/writei) instead of read/write\n"
                "  --pipeline C         two-core A2 pipeline (8 = Full, 3 = Lite); adds one period of latency\n"
                "  --pipeline-cpu N     worker core (default 2 with --cpu 3)\n"
@@ -143,6 +145,8 @@ bool ParseArgs(int argc, char** argv, Args& a)
       a.summaryOut = next("--summary-out");
     else if (s == "--latency-out")
       a.latencyOut = next("--latency-out");
+    else if (s == "--record")
+      a.recordOut = next("--record");
     else if (s == "--mmap")
       a.mmap = true;
     else if (s == "--pipeline")
@@ -418,6 +422,8 @@ int main(int argc, char** argv)
   NAM_SAMPLE* outPtrs[1] = {outBuf.data()};
   const size_t maxPeriods = static_cast<size_t>(std::ceil(a.durationSec * a.rate / N)) + 1;
   std::vector<int64_t> procNs(maxPeriods, 0), cycleNs(maxPeriods, 0);
+  // Recording buffer, preallocated for the whole run (interleaved dry/out), filled per good period.
+  std::vector<float> rec(a.recordOut.empty() ? 0 : maxPeriods * N * 2, 0.0f);
   std::vector<uint32_t> xrunAt(1024, 0);
   // Latency test: emission frame of the current click, and measured round trips.
   const int64_t clickEvery = a.rate / 2, clickLen = 16;
@@ -511,6 +517,15 @@ int main(int argc, char** argv)
     prevRead = tRead;
     inFrames += N;
     outFrames += N;
+    if (!rec.empty())
+    {
+      float* r = rec.data() + nPeriods * static_cast<size_t>(N) * 2;
+      for (int i = 0; i < N; i++)
+      {
+        r[2 * i] = static_cast<float>(inBuf[i]);
+        r[2 * i + 1] = static_cast<float>(outBuf[i]);
+      }
+    }
     nPeriods++;
   }
 
@@ -556,6 +571,16 @@ int main(int argc, char** argv)
       << cpuPct << "," << a.rt << "," << (a.rt ? a.rtPrio : 0) << "," << a.cpu << ",\"" << isolated << "\",\""
       << KernelInfo() << "\"," << pssKb << "," << peakRssKb << "," << (a.mmap ? "mmap" : "rw") << ","
       << (a.pipeline.empty() ? "none" : a.pipeline) << ",\"" << BENCH_BUILD_FLAGS << "\"\n";
+  }
+
+  if (!a.recordOut.empty())
+  {
+    EnsureParentDir(a.recordOut);
+    if (!WriteWavFloat(a.recordOut, rec.data(), nPeriods * static_cast<size_t>(N), 2, a.rate))
+      std::cerr << "Failed to write " << a.recordOut << "\n";
+    else
+      std::fprintf(stderr, "recorded %.1f s to %s (left = dry input, right = output)\n",
+                   static_cast<double>(nPeriods) * N / a.rate, a.recordOut.c_str());
   }
 
   if (!a.periodsOut.empty())
