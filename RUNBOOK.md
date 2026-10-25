@@ -3,6 +3,12 @@
 Everything below writes CSV to `results/`. README numbers come from `results/kpi_tables.md`
 and `results/*.csv`, nothing else.
 
+**Build used for all results from here on: clang 16, cross-compiled on the Mac** (section 1b), deployed
+to the Pi's `build/` so every script's default `./build/bench` / `./build/live` is the clang build.
+After any code change: `./scripts/cross_build.sh && PI_USER=<you> ./scripts/deploy.sh`.
+The one GCC 14.2 vs clang comparison (block 128, one run each) is kept in `results-pi/summary_gcc.csv`
+and `summary_clang.csv`: GCC was 7% faster at Lite p50 (10% at p99), and the two were within ~1% on Full.
+
 ## 0. Flash + boot (15 min, laptop)
 Raspberry Pi Imager → Raspberry Pi OS Lite (32-bit) → settings: hostname `pi-amp`, your user,
 SSH with public key. Ethernet to the router, power on, then:

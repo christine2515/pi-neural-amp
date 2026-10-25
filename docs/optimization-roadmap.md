@@ -64,6 +64,9 @@ the most.
 - **ALSA mmap (item 14): in the plan.** Add `--mmap` to `live` and run it as its own `live_sweep.sh`
   arm (`TAG=live_mmap`), even though the expected effect is small. It's cheap, and "no change" is
   a result worth reporting.
+- **Compiler (item 2): clang 16 cross-build for everything.** Faster to iterate. The one comparison
+  run (Pi, block 128, one run each) had GCC 14.2 7% faster on Lite p50 and within ~1% on Full,
+  kept in `results-pi/`. Revisit GCC only if a final number needs the last few percent.
 - **I2S converters (item 16): a consideration for later.** Decide after the USB floor is measured
   (`live --bypass` + `latency_test.sh`, item 15). If the Scarlett path sets the latency floor, an
   I2S ADC/DAC HAT plus a guitar buffer is the next hardware step.
