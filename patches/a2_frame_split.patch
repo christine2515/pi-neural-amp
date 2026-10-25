@@ -1,0 +1,367 @@
+--- a/NAM/wavenet/a2_fast.cpp	2026-10-25 02:00:54
++++ b/NAM/wavenet/a2_fast.cpp	2026-10-25 02:16:14
+@@ -49,6 +49,16 @@
+     #endif
+   #else
+     #define NAM_A2_FULL_NEON 0
++  #endif
++
++  // Frame split (a2_frame_split.patch) needs ring mode 0, both NEON kernels (whole 4-frame tiles) and
++  // pthreads.
++  #if NAM_A2_RING_MODE == 0 && NAM_A2_FULL_NEON && !defined(NAM_A2_LITE_SCALAR) && \
++    (defined(__linux__) || defined(__APPLE__))
++    #include <pthread.h>
++    #define NAM_A2_FSPLIT 1
++  #else
++    #define NAM_A2_FSPLIT 0
+   #endif
+ 
+   #include "../dsp.h"
+@@ -244,6 +254,10 @@
+     _stop.store(true, std::memory_order_release);
+     if (_worker.joinable())
+       _worker.join();
++  #if NAM_A2_FSPLIT
++    for (int i = 0; i < _fs_nworkers; i++)
++      pthread_join(_fs_workers[i], nullptr);
++  #endif
+   }
+ 
+   void process(NAM_SAMPLE** input, NAM_SAMPLE** output, int num_frames) override;
+@@ -356,6 +370,40 @@
+   void _stage_a(const NAM_SAMPLE* in0, int num_frames);
+   void _stage_b();
+   void _worker_main(int cpu, int prio);
++
++  #if NAM_A2_FSPLIT
++  // Frame split (NAM_A2_FSPLIT=8|3|all at load time): the calling thread and up to 3 pinned workers each
++  // run every layer on their own slice of the block's frames (whole 4-frame tiles), with one barrier
++  // per layer (a layer reads the previous layer's output at earlier frames, which another thread may
++  // have produced). Output is NOT delayed, unlike the pipeline. Each thread owns a step counter on its
++  // own cache line; a barrier publishes the own counter (release) and waits for all the others
++  // (acquire). Barriers per block: 1 (start) + 23 (layers) + 1 (head) + 1 (end).
++  struct alignas(64) FsStep
++  {
++    std::atomic<uint32_t> v{0};
++  };
++  bool _fs_enabled = false;
++  int _fs_threads = 1; // participants, including the calling thread
++  std::array<FsStep, 4> _fs_step;
++  int _fs_n = 0;
++  std::array<int, 5> _fs_bounds{};
++  const NAM_SAMPLE* _fs_in = nullptr;
++  std::array<pthread_t, 3> _fs_workers{};
++  struct FsArg
++  {
++    A2FastModel* self;
++    int idx, cpu, prio;
++  };
++  std::array<FsArg, 3> _fs_args{};
++  int _fs_nworkers = 0;
++  bool _fs_barrier(int idx);
++  void _fs_prepare(const NAM_SAMPLE* in0, int num_frames);
++  bool _fs_run(int idx);
++  void _fs_worker_main(int idx, int cpu, int prio);
++  template <int KernelSize>
++  void _layer_range(Layer& L, const float* cond, int num_frames, int f0, int f1);
++  void _head_range(float* output, int num_frames, int f0, int f1);
++  #endif
+ 
+   int _prewarm_samples = 0;
+   bool _has_cached_prewarm_state = false;
+@@ -440,7 +488,72 @@
+     const int cpu = c ? std::atoi(c) : -1;
+     const int prio = r ? std::atoi(r) : 0;
+     _worker = std::thread([this, cpu, prio] { _worker_main(cpu, prio); });
++  }
++  #if NAM_A2_FSPLIT
++  // NAM_A2_FSPLIT: "8" (Full), "3" (Lite), "all"; NAM_A2_FSPLIT_THREADS = 2..4 participants (default 2);
++  // NAM_A2_FSPLIT_CPUS = worker cores, comma-separated (default "2,1,0"); NAM_A2_FSPLIT_PRIO = SCHED_FIFO
++  // priority for the workers (0 = normal). Ignored when the pipeline is on.
++  if (const char* fe = std::getenv("NAM_A2_FSPLIT"); fe && !_pipe_enabled)
++  {
++    const std::string v(fe);
++    _fs_enabled = v == "all" || v == "1" || v.find(std::to_string(Channels)) != std::string::npos;
++  }
++  if (_fs_enabled)
++  {
++    const char* t = std::getenv("NAM_A2_FSPLIT_THREADS");
++    _fs_threads = std::max(2, std::min(4, t ? std::atoi(t) : 2));
++    int cpus[3] = {2, 1, 0};
++    if (const char* c = std::getenv("NAM_A2_FSPLIT_CPUS"))
++    {
++      int i = 0;
++      for (const char* q = c; *q && i < 3; i++)
++      {
++        cpus[i] = std::atoi(q);
++        while (*q && *q != ',')
++          q++;
++        if (*q == ',')
++          q++;
++      }
++    }
++    const char* r = std::getenv("NAM_A2_FSPLIT_PRIO");
++    const int prio = r ? std::atoi(r) : 0;
++    for (int i = 1; i < _fs_threads; i++)
++    {
++      _fs_args[i - 1] = {this, i, cpus[i - 1], prio};
++      pthread_attr_t attr;
++      pthread_attr_init(&attr);
++      pthread_attr_setstacksize(&attr, 256 * 1024); // mlockall would otherwise pin the default 8 MB
++    #if defined(__linux__)
++      // Core and policy set at creation: a thread that inherited a spinning SCHED_FIFO creator's core
++      // could never run to move itself.
++      cpu_set_t set;
++      CPU_ZERO(&set);
++      CPU_SET(cpus[i - 1], &set);
++      pthread_attr_setaffinity_np(&attr, sizeof(set), &set);
++      if (prio > 0)
++      {
++        sched_param sp{};
++        sp.sched_priority = prio;
++        pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
++        pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
++        pthread_attr_setschedparam(&attr, &sp);
++      }
++    #endif
++      const int rc = pthread_create(
++        &_fs_workers[i - 1], &attr,
++        [](void* p) -> void* {
++          FsArg* a = static_cast<FsArg*>(p);
++          a->self->_fs_worker_main(a->idx, a->cpu, a->prio);
++          return nullptr;
++        },
++        &_fs_args[i - 1]);
++      pthread_attr_destroy(&attr);
++      if (rc != 0)
++        throw std::runtime_error("A2FastModel: could not start frame-split worker");
++      _fs_nworkers = i;
++    }
+   }
++  #endif
+ }
+ 
+ // -----------------------------------------------------------------------------
+@@ -1244,6 +1357,20 @@
+   const NAM_SAMPLE* in0 = input[0];
+   NAM_SAMPLE* out0 = output[0];
+ 
++  #if NAM_A2_FSPLIT
++  if (_fs_enabled && !_in_prewarm && num_frames % 4 == 0)
++  {
++    tl_b = &_sets[0];
++    _fs_prepare(in0, num_frames);
++    _fs_barrier(0); // start: workers read the block parameters after this
++    _fs_run(0);     // ends with a barrier, so every thread's frames are done
++    const float* head_out = tl_b->head_out.data();
++    for (int f = 0; f < num_frames; f++)
++      out0[f] = static_cast<NAM_SAMPLE>(head_out[f]);
++    return;
++  }
++  #endif
++
+   if (!_pipe_enabled || _in_prewarm)
+   {
+     tl_b = &_sets[0];
+@@ -1291,7 +1418,201 @@
+   _seq++;
+ }
+ 
++  #if NAM_A2_FSPLIT
+ // -----------------------------------------------------------------------------
++// Frame split (see the class comment). Ring mode 0 only: the calling thread does every ring rewind and
++// advances every write position before the start barrier, so during the block each thread only
++// copies its own frames into the histories.
++// -----------------------------------------------------------------------------
++template <int Channels>
++bool A2FastModel<Channels>::_fs_barrier(int idx)
++{
++  const uint32_t s = _fs_step[idx].v.load(std::memory_order_relaxed) + 1;
++  _fs_step[idx].v.store(s, std::memory_order_release);
++  for (int u = 0; u < _fs_threads; u++)
++  {
++    if (u == idx)
++      continue;
++    while (static_cast<int32_t>(_fs_step[u].v.load(std::memory_order_acquire) - s) < 0)
++    {
++      if (idx != 0 && _stop.load(std::memory_order_relaxed))
++        return false;
++    #if defined(__arm__) || defined(__aarch64__)
++      asm volatile("yield");
++    #endif
++    }
++  }
++  return true;
++}
++
++template <int Channels>
++void A2FastModel<Channels>::_fs_prepare(const NAM_SAMPLE* in0, int num_frames)
++{
++  for (auto& L : _layers)
++  {
++    if (L.write_pos + num_frames > L.history_cols)
++    {
++      const int keep = L.max_lookback;
++      std::memmove(L.history.data(), L.history.data() + static_cast<size_t>(L.write_pos - keep) * Channels,
++                   static_cast<size_t>(keep) * Channels * sizeof(float));
++      L.write_pos = keep;
++    }
++    L.write_pos += num_frames;
++  }
++  const int hkeep = kHeadKernelSize - 1;
++  if (_head_write_pos + num_frames > _head_history_cols)
++  {
++    std::memmove(_head_history.data(), _head_history.data() + static_cast<size_t>(_head_write_pos - hkeep) * Channels,
++                 static_cast<size_t>(hkeep) * Channels * sizeof(float));
++    _head_write_pos = hkeep;
++  }
++  _head_write_pos += num_frames;
++
++  // Whole 4-frame tiles per thread, as even as possible.
++  const int tiles = num_frames / 4;
++  const int base = tiles / _fs_threads, extra = tiles % _fs_threads;
++  _fs_bounds[0] = 0;
++  for (int i = 0; i < _fs_threads; i++)
++    _fs_bounds[i + 1] = _fs_bounds[i] + 4 * (base + (i < extra ? 1 : 0));
++  _fs_n = num_frames;
++  _fs_in = in0;
++  _sets[0].num_frames = num_frames;
++}
++
++template <int Channels>
++bool A2FastModel<Channels>::_fs_run(int idx)
++{
++  const int n = _fs_n, f0 = _fs_bounds[idx], f1 = _fs_bounds[idx + 1];
++  const size_t nf = static_cast<size_t>(f1 - f0);
++  Bufs& b = *tl_b;
++  float* cond = b.cond.data();
++  float* lin = b.layer_in.data();
++  for (int f = f0; f < f1; f++)
++  {
++    const float x = static_cast<float>(_fs_in[f]);
++    cond[f] = x;
++    for (int c = 0; c < Channels; c++)
++      lin[static_cast<size_t>(f) * Channels + c] = _rechannel_w[c] * x;
++  }
++  std::memset(b.head_sum.data() + static_cast<size_t>(f0) * Channels, 0, nf * Channels * sizeof(float));
++
++  for (int li = 0; li < kNumLayers; li++)
++  {
++    Layer& L = _layers[li];
++    std::memcpy(L.history.data() + static_cast<size_t>(L.write_pos - n + f0) * Channels,
++                lin + static_cast<size_t>(f0) * Channels, nf * Channels * sizeof(float));
++    if (!_fs_barrier(idx))
++      return false;
++    if (L.kernel_size == 6)
++      _layer_range<6>(L, cond, n, f0, f1);
++    else
++      _layer_range<15>(L, cond, n, f0, f1);
++  }
++  std::memcpy(_head_history.data() + static_cast<size_t>(_head_write_pos - n + f0) * Channels,
++              b.head_sum.data() + static_cast<size_t>(f0) * Channels, nf * Channels * sizeof(float));
++  if (!_fs_barrier(idx))
++    return false;
++  _head_range(b.head_out.data(), n, f0, f1);
++  return _fs_barrier(idx);
++}
++
++template <int Channels>
++void A2FastModel<Channels>::_fs_worker_main(int idx, int cpu, int prio)
++{
++    #if defined(__linux__)
++  if (cpu >= 0)
++  {
++    cpu_set_t set;
++    CPU_ZERO(&set);
++    CPU_SET(cpu, &set);
++    pthread_setaffinity_np(pthread_self(), sizeof(set), &set);
++  }
++  if (prio > 0)
++  {
++    sched_param sp{};
++    sp.sched_priority = prio;
++    pthread_setschedparam(pthread_self(), SCHED_FIFO, &sp);
++  }
++    #else
++  (void)cpu;
++  (void)prio;
++    #endif
++  tl_b = &_sets[0];
++  while (_fs_barrier(idx) && _fs_run(idx))
++  {
++  }
++}
++
++// One layer on frames [f0, f1) of an n-frame block (f1 - f0 a multiple of 4; histories already hold
++// this block's input columns for every frame).
++template <int Channels>
++template <int KernelSize>
++void A2FastModel<Channels>::_layer_range(Layer& L, const float* cond, int num_frames, int f0, int f1)
++{
++  constexpr int K = KernelSize;
++  const int D = L.dilation;
++  const int base = L.write_pos - num_frames;
++  const float* tap0[K];
++  for (int k = 0; k < K; k++)
++    tap0[k] = &L.history[static_cast<size_t>(base - (K - 1 - k) * D) * Channels];
++  float* hs = tl_b->head_sum.data();
++  float* li = tl_b->layer_in.data();
++  if constexpr (Channels == 3)
++  {
++    for (int f = f0; f + 4 <= f1; f += 4)
++    {
++      const float* taps[K];
++      for (int k = 0; k < K; k++)
++        taps[k] = tap0[k] + f * 3;
++      a2_lite_tile4<K>(taps, L.conv_w4.data(), L.conv_b4.data(), L.mixin_w4.data(), L.l1x1_w4.data(),
++                       L.l1x1_b4.data(), cond + f, hs + static_cast<size_t>(f) * 3, li + static_cast<size_t>(f) * 3,
++                       kLeakySlope);
++    }
++  }
++  else
++  {
++    int f = f0;
++    for (; f + 4 <= f1; f += 4)
++    {
++      const float* taps[K];
++      for (int k = 0; k < K; k++)
++        taps[k] = tap0[k] + f * 8;
++      a2_full_tile<K, 4>(taps, L.conv_w.data(), L.conv_b.data(), L.mixin_w.data(), L.l1x1_w.data(),
++                         L.l1x1_b.data(), cond + f, hs + f * 8, li + f * 8, kLeakySlope);
++    }
++    for (; f < f1; f++)
++    {
++      const float* taps[K];
++      for (int k = 0; k < K; k++)
++        taps[k] = tap0[k] + f * 8;
++      a2_full_tile<K, 1>(taps, L.conv_w.data(), L.conv_b.data(), L.mixin_w.data(), L.l1x1_w.data(),
++                         L.l1x1_b.data(), cond + f, hs + f * 8, li + f * 8, kLeakySlope);
++    }
++  }
++}
++
++template <int Channels>
++void A2FastModel<Channels>::_head_range(float* output, int num_frames, int f0, int f1)
++{
++  const int base = _head_write_pos - num_frames;
++  constexpr int kLen = kHeadKernelSize * Channels;
++  const float* w = _head_w[0].data();
++  for (int f = f0; f < f1; f++)
++  {
++    const float* src = &_head_history[static_cast<size_t>(base + f - (kHeadKernelSize - 1)) * Channels];
++    #if defined(__ARM_NEON) && !defined(__aarch64__)
++    output[f] = (_head_b + a2_head_dot<kLen>(w, src)) * _head_scale;
++    #else
++    float y = _head_b;
++    for (int i = 0; i < kLen; i++)
++      y += w[i] * src[i];
++    output[f] = y * _head_scale;
++    #endif
++  }
++}
++  #endif // NAM_A2_FSPLIT
++
++// -----------------------------------------------------------------------------
+ // A2FastConfig — wraps the constructed DSP behind the ModelConfig interface.
+ // -----------------------------------------------------------------------------
+ struct A2FastConfig : public ModelConfig

@@ -136,3 +136,15 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(armv7|armhf|arm$)")
     target_link_libraries(int_peak PRIVATE Threads::Threads)
   endif()
 endif()
+
+# sync_peak: cross-core handoff / barrier cost; kernel_peak: Full layer kernel variants in L1
+# (ARMv7 builds only). See docs/low-latency-plan.md.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(armv7|armhf|arm$)")
+  foreach(_tool sync_peak kernel_peak)
+    add_executable(${_tool} src/${_tool}.cpp)
+    target_compile_options(${_tool} PRIVATE ${ARCH_FLAGS} -O2)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+      target_link_libraries(${_tool} PRIVATE Threads::Threads)
+    endif()
+  endforeach()
+endif()
