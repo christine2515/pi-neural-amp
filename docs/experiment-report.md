@@ -516,3 +516,27 @@ busy cores. What remains is 7 marginal overruns (≤35 µs over the 2,667 µs de
 an inference until `live` runs on the Scarlett. Isolating cores 2–3 from the OS is the measured-next
 lever. **Lesson for the write-up:** two of the three biggest "tail latency problems" in this project
 were caused by the measurement tools (the memory sampler and the thermal logger), not the model.
+
+### Iteration 13: let clang emit VMLA everywhere (`vmla`)
+
+**Hypothesis.** Round-2 research found LLVM treats `cortex-a7` as slow at VMLA and splits multiply-adds into
+`vmul` + `vadd`. The NEON kernels already override this per function (`target("no-slowfpvmlx")`). Turning
+it off for the whole build (`-Xclang -target-feature -Xclang -slowfpvmlx`) should help the remaining
+scalar and Eigen code. Estimate (roadmap R2-4): 0–15% on scalar code.
+
+**Change.** Same as `neon` (both NEON patches, `ring0`) plus the flag via `CMAKE_CXX_FLAGS` (build
+`build-armhf-nvmla`; `build_flags` now records `cxxflags=[…]`). `llvm-objdump`: 841 `vmla.f32` vs 654,
+and 416 `vmul.f32` vs 606. The flag took effect.
+
+**Result** (block 128, burst, 3 runs, unpipelined):
+
+| | Lite p50 / p99 | Full p50 / p99 |
+|---|---|---|
+| `neon` | 849 / 921 µs | 3,511 / 3,732 µs |
+| `vmla` | 855 / 925 µs | 3,527 / 3,739 µs |
+
+**Verdict: no effect (+0.5–0.7%, within run-to-run noise). Don't adopt.** The hot loops are the hand
+kernels, which already use VMLA. The code the flag changed accounts for a few percent of the time, and
+iteration 7 showed VMLA and separate VMUL + VADD have about the same throughput on the A7 anyway
+(both ~1 float op per cycle). The split mainly costs extra instructions, which matters only in code
+that's already instruction-bound.
