@@ -655,3 +655,51 @@ strings made no difference. Fixes, in order: face away from power bricks and scr
 selector positions 2/4 (hum-cancelling if the middle pickup is reverse-wound, reverse-polarity,
 unverified for this guitar); a noise gate before the model (no added latency); noiseless pickups or
 shielding.
+
+### Live sweeps: smallest clean buffer, mmap, periods (`lsw_*` labels in `results-pi/live_summary.csv`)
+
+Scarlett Solo, `--rt --cpu 3`, guitar on channel 1, 20 s per configuration; underruns / periods:
+
+| Config | 32 × 2 | 32 × 3 | 64 × 2 | 64 × 3 | 128 × 2 | 128 × 3 |
+|---|---|---|---|---|---|---|
+| Lite | **0** / 30,000 | 0 | 0 | 0 | 0 | 0 |
+| Lite + `--mmap` | 0 | 0 | 0 | 0 | 0 | 0 |
+| Full pipelined | — | — | **0** / 15,000 | 0 | 0 | 0 |
+| Full pipelined + `--mmap` | — | — | **688** / 15,000 | 0 | **7,517** / 7,500 | 0 |
+
+Lite at 16 frames: 16 × 3 → 15 / 60,000; 16 × 4 → 1 / 60,000 (bypass at 16 × 3 and 16 × 4: 0). With 3+
+periods the USB path handles 16-frame periods; with 2 it doesn't (earlier: bypass 16 × 2 underran every
+other period).
+
+**Findings.**
+- **Smallest clean buffers, live:** Lite **32 × 2 = 1.33 ms**; Full pipelined **64 × 2 = 2.67 ms** + one
+  64-sample pipeline block = **4.0 ms** of in-device buffering (clean in this 20 s run; earlier 30 s takes
+  at 64 × 2 had 0, 1 and 2 underruns, so "near-zero" until the 10-minute run below).
+- **ALSA mmap (Reddit idea): no benefit.** Lite's timing and underruns are unchanged with mmap. Pipelined Full
+  with mmap and **2 periods fails** (688 underruns at 64, every period at 128) while 3 periods is clean.
+  Cause not investigated: the model times are the same, so it's an mmap + 2-period start/refill interaction,
+  not compute. Keep the default read/write access.
+- Live model times match offline `bench` (Lite 32: p99 294 µs; Full pipelined 64: p99 1,074 µs).
+
+### Live memory: the pipeline worker's stack (`patches/a2_pipeline_stack.patch`)
+
+Under `--rt`, `mlockall(MCL_FUTURE)` locked the pipeline worker's default 8 MB thread stack into RAM, so
+pipelined Full showed 13.8 MB PSS vs Lite's 5.5 MB. The patch starts the worker as a pthread with a 256 KB
+stack. Full pipelined, 64 × 3, 15 s each (`memfix_*`): **PSS 13,778 → 5,842 kB**, p99 1,071 vs 1,079 µs,
+0 underruns both. Adopted (build `nhead2`, deployed to the Pi's `build/`). **Live memory: Lite 5.5 MB,
+Full pipelined 5.8 MB** (whole process: model, ALSA buffers, libraries).
+
+### Live noise gate (`live --gate`, `src/common.h` NoiseGate)
+
+Threshold chosen from data: hum peaks −56 to −53 dBFS at the worst guitar positions vs a median playing
+peak of −13 dBFS → open at −50 dBFS, close at −54 (4 dB hysteresis), 80 ms hold, 1 ms attack ramp,
+100 ms release; no look-ahead, so **no added latency**. Full pipelined 64 × 2, 30 s takes; amp output in
+the 10 quietest 0.1 s windows:
+
+| Take | Audible noise (AC) | DC offset (inaudible, model bias) |
+|---|---|---|
+| without gate | −58.3 dBFS | −70.0 dBFS |
+| **with `--gate -50`** | **−88.5 dBFS (−30 dB)** | −70.3 dBFS |
+
+Offline on the same recording, playing passages were unchanged (0.0 dB). The gated take had 2 underruns in
+30 s (max 1,992 µs).
