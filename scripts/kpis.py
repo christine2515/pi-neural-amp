@@ -207,7 +207,7 @@ def sustained(tag="sustained"):
         ts = sorted(e for e, _ in minutes[m])
         lo, hi = t_start + 60 * m, t_start + 60 * (m + 1)
         win = [t for t in temps if lo <= float(t["unix_time"]) < hi]
-        num = lambda k: [float(t[k]) for t in win if t[k] not in ("na", "")]
+        num = lambda k: [float(t[k]) for t in win if t.get(k) not in (None, "na", "")]
         temp, freq = num("temp_c"), num("scaling_cur_freq_khz")
         out.append({
             "minute": m, "blocks": len(ts),

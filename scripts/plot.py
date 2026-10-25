@@ -167,10 +167,11 @@ def plot_thermal(rows, suffix=""):
     ax1.plot(t, [float(r["temp_c"]) if r["temp_c"] != "na" else None for r in rows], color="orange")
     ax1.set_ylabel("temp (°C)")
     ax1.set_xlabel("minutes")
-    ax2 = ax1.twinx()
-    ax2.plot(t, [int(r["scaling_cur_freq_khz"]) / 1000 if r["scaling_cur_freq_khz"] != "na" else None
-                 for r in rows], lw=0.8)
-    ax2.set_ylabel("CPU MHz")
+    if "scaling_cur_freq_khz" in rows[0]:  # older loggers polled frequency every second
+        ax2 = ax1.twinx()
+        ax2.plot(t, [int(r["scaling_cur_freq_khz"]) / 1000 if r["scaling_cur_freq_khz"] != "na" else None
+                     for r in rows], lw=0.8)
+        ax2.set_ylabel("CPU MHz")
     ax1.set_title("temperature and CPU frequency")
     save(fig, f"thermal{suffix}.png")
 
@@ -185,7 +186,7 @@ def main():
         plot_missed(kpis)
     plot_compare(read_csv("rt_comparison.csv"))
     plot_memory(read_csv("kpi_memory.csv"))
-    for path in sorted(glob.glob(os.path.join(RESULTS, "thermal_sustained*.csv"))):
+    for path in sorted([p for p in glob.glob(os.path.join(RESULTS, "thermal_sustained*.csv")) if not p.endswith("_throttled.csv")]):
         tag = os.path.basename(path)[len("thermal_"):-4]
         suffix = "" if tag == "sustained" else "_" + tag[len("sustained_"):]
         plot_sustained(read_csv(f"sustained_per_minute{suffix}.csv"), suffix)

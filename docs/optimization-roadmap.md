@@ -341,7 +341,7 @@ patch. Measure per-stage block times separately. The current harness times one `
 so you'd need a `--pipeline 2` flag that reports each stage's p99 and the end-to-end latency.
 **Pitfalls.** Synchronize lock-free and without syscalls in the audio path (spin on an atomic with a
 bounded wait, since a futex is a syscall). Two SCHED_FIFO threads on isolated cores means isolating
-two cores (`isolcpus=2,3`). Watch `thermal_logger.sh`: two cores pegged on a Pi 2 is a different
+two cores (`isolcpus=2,3`). Watch `thermal_logger.py`: two cores pegged on a Pi 2 is a different
 thermal regime from one.
 
 ### 10. Flush-to-zero in the audio thread
@@ -446,7 +446,7 @@ traffic shares the bus with your audio. The Pi 5's USB and Ethernet hang off RP1
    optimizing anything below it.
 4. Interference: rerun one `live_sweep.sh` configuration while `iperf3` or an rsync pushes Ethernet
    traffic, and compare xruns. Run sessions from `tmux` and detach, so SSH output isn't streaming.
-5. Power: `vcgencmd get_throttled` (logged by `thermal_logger.sh`). The RUNBOOK already suggests a
+5. Power: `vcgencmd get_throttled` (logged by `thermal_logger.py`). The RUNBOOK already suggests a
    powered hub if the Scarlett crackles.
 
 ### 16. I2S ADC/DAC HAT
@@ -464,7 +464,7 @@ says), with shielding. You lose the Scarlett's preamp. Device-tree overlay setup
 Estimate: at most +11% (1000/900), and less wherever time goes to memory (DRAM doesn't speed up
 with the core clock). It doesn't change the ranking: it can't close Full's 2.6x gap. **Test:**
 `arm_freq=1000` in `config.txt` (plus whatever `over_voltage` your board needs). Then a
-30-minute `sustained.sh` with `thermal_logger.sh` running, checking that `throttled_ever` stays 0.
+30-minute `sustained.sh` with `thermal_logger.py` running, checking that `throttled_ever` stays 0.
 **Pitfalls:** stability (run sustained before believing any sweep), SD-card corruption on a crash,
 and it's a per-board result.
 

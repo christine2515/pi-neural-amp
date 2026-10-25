@@ -14,7 +14,7 @@ EXTRA=${EXTRA:-}
 TAG=${TAG:-sustained}
 mkdir -p results/blocks/$TAG results/mem/$TAG
 
-./scripts/thermal_logger.sh "results/thermal_${TAG}.csv" 1 &
+python3 scripts/thermal_logger.py "results/thermal_${TAG}.csv" 1 &
 LOGGER=$!
 trap 'kill $LOGGER 2>/dev/null || true' EXIT
 sleep "${IDLE:-30}"   # idle baseline before load

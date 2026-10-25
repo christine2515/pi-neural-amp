@@ -468,6 +468,22 @@ get_throttled` every second). Chart: `results-pi/charts/thermal_full_pipe.png`.
 a mailbox. Calling it every second stalled the audio cores (2 and 3) for up to ~5 ms. This is the second
 time monitoring has disturbed the measurement (the memory sampler in Control 2), so the rule is now:
 **nothing that forks or talks to firmware may run periodically during a timed run.**
-**Fix:** `thermal_logger.sh` now reads only sysfs (temperature, CPU frequency, the hwmon under-voltage
-alarm) and calls `vcgencmd get_throttled` once at start and once at exit. Its "has occurred" bits are
-sticky, so the exit reading still covers the whole run. Run 2 (below) repeats the 30 minutes with it.
+**Fix, attempt 1** (run 2, `sustained_full_pipe2`): the shell logger reading only sysfs (temperature,
+CPU frequency, hwmon under-voltage alarm) and calling `vcgencmd get_throttled` only at start and exit.
+Overruns fell from 66 to 14 in 30 minutes, but **late wake-ups of 1.5–2.9 ms every ~2.1 s** remained,
+i.e. on every other logger tick (the loop takes ~1.07 s). The logger still forks `cat`/`cut`/`date`
+each tick and reads cpufreq and hwmon files that may go through the firmware.
+
+**Fix, attempt 2:** `scripts/thermal_logger.py`, one Python process that never forks. Each second it
+reads only the temperature register from sysfs. Frequency, under-voltage alarm and `get_throttled` are
+read only at start and exit (the "has occurred" bits are sticky, so the exit reading covers the run).
+
+| 10 minutes, Full pipelined, `--rt`, 128, paced | overruns | wake-ups > 1 ms | late incl. catch-up | max | wake max |
+|---|---|---|---|---|---|
+| no logger (`ctl_nologger`) | 0 | 0 | 1 | 2,644 µs | 224 µs |
+| **Python logger (`ctl_pylogger`)** | **0** | **0** | **0** | 2,610 µs | 252 µs |
+| shell logger, sysfs only (run 2, first 600 s) | 3 | 741 | 858 | 3,494 µs | 4,867 µs |
+| shell logger, `vcgencmd` every second (run 1, first 600 s) | 26 | 826 | 1,035 | 6,954 µs | 5,142 µs |
+
+**The Python logger is indistinguishable from no logger.** The 30-minute run is repeated with it
+(run 3, below). The shell logger is removed from the repo.
