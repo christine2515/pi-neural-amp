@@ -8,10 +8,10 @@ the analysis commands shown. Estimates are labeled as estimates.
 
 | | First baseline | Best so far | How |
 |---|---|---|---|
-| **Full**, block 128, p50 | 6,696 µs (251% load, misses every block) | **1,785 µs (67% load)** | NEON kernel (1.91×) + two-core pipeline (1.97×) = **3.75×** |
+| **Full**, block 128, p50 | 6,696 µs (251% load, misses every block) | **1,767 µs (66% load)** | NEON kernel (1.91×) + two-core pipeline (1.97×) + NEON head (1.01×) = **3.79×** |
 | **Full**, smallest clean block (paced) | none | **128 samples**: 7 marginal overruns (≤35 µs) in 30 min, no stalls; 256 clean | + 1 block pipeline delay, `--rt` |
 | **Full**, 30 min sustained | — | p50 1,786 / p99 1,922 µs, flat; 44 °C peak, never throttled | |
-| **Lite**, block 128, p50 | 1,032 µs (39% load) | **849 µs (32%)** | ring mode 0 + NEON kernel (1.22×) |
+| **Lite**, block 128, p50 | 1,032 µs (39% load) | **843 µs (32%)** | ring mode 0 + NEON kernel + NEON head (1.22×) |
 | **Lite**, smallest clean block (paced, `--rt`) | — | **32 samples (0.67 ms)**, or 16 pipelined (same total delay) | |
 | Memory (bench PSS minus test file) | ~4 MiB | — | measured, not optimized |
 
@@ -22,8 +22,10 @@ vectorization only pays by cutting non-arithmetic instructions, and the second c
 Measurement lesson: the memory sampler (+27% Lite p99) and the thermal logger (stalls up to 7 ms) were
 the biggest tail-latency sources found; both are now fixed (self-reported memory, fork-free logger).
 
-**Remaining items Claude can run:** clang VMLA flag on scalar code (R2-4), GCC 14 native build,
-head-conv vectorization (R2-7), int16 Full (R2-9, research).
+Also tried and measured: a global clang VMLA flag (no effect) and a native GCC 14 build (Lite −6%,
+Full +26% from register spills in the hand kernel; clang kept). **Best build: `nhead`** = ring mode 0 +
+`a2_full_neon_tile` + `a2_lite_neon_lanes` + `a2_pipeline` + `a2_head_neon`, clang 16.
+Remaining Claude-runnable item: int16 Full (R2-9, research; expected to miss the −100 dB accuracy bar).
 
 Waiting on Christine: core isolation (sudo + reboot), PREEMPT_RT kernel, Scarlett connected (live,
 mmap, round-trip latency), I2S hardware.
@@ -540,3 +542,52 @@ kernels, which already use VMLA. The code the flag changed accounts for a few pe
 iteration 7 showed VMLA and separate VMUL + VADD have about the same throughput on the A7 anyway
 (both ~1 float op per cycle). The split mainly costs extra instructions, which matters only in code
 that's already instruction-bound.
+
+### Iteration 14: head convolution as one NEON dot product (`head`)
+
+**Hypothesis.** The output head (kernel 16, `Channels` → 1) ran as a scalar triple loop with a masked
+index computation per tap. Its 16 taps for one frame are 16 consecutive history columns, contiguous in
+memory in both ring modes, so each output is one dot product of 16 × `Channels` floats (48 for Lite,
+128 for Full). Estimate: the head is 2.8% (Lite) / 1.1% (Full) of the MACs, so ≤1–2%.
+
+**Change.** `patches/a2_head_neon.patch` (after the pipeline patch): flattened weights, two NEON
+accumulators (to cover VMLA's 5-cycle latency, iteration 7), scalar fallback off ARMv7. Build
+`build-armhf-nhead` = `npipe` + head.
+
+**Result** (block 128, burst, 3 runs; reference `clangref` = `npipe` measured in the same session):
+
+| | Lite p50 / p99 | Full (pipelined) p50 / p99 | Full missed |
+|---|---|---|---|
+| `clangref` | 855 / 932 µs | 1,786 / 1,938 µs | 2 / 78,075 |
+| **`head`** | **843 / 917 µs (−1.4%)** | **1,767 / 1,910 µs (−1.1%)** | 4 / 78,075 |
+
+**Accuracy (Pi).** vs `neon`: Lite −135.7 dB, Full −129.9 dB relative (summation order).
+
+**Verdict: adopt.** Small, as predicted, and free. `nhead` (ring0 + Full tile + Lite lanes + pipeline +
+head) is the new best build.
+
+### Iteration 15: GCC 14 native build vs clang 16 cross build (`gcc14`)
+
+**Question.** Is clang (cross-compiled for convenience) costing performance? Built natively on the Pi with
+Raspbian's GCC 14.2 and the same three patches + `ring0` (`build-gcc`; build time 12 min 24 s with `-j2`).
+
+| | Lite p50 / p99 | Full (pipelined) p50 / p99 | Full missed / load |
+|---|---|---|---|
+| clang 16 (`clangref`) | 855 / 932 µs | **1,786 / 1,938 µs** | 2 / 67.6% |
+| GCC 14 (`gcc14`) | **801 / 885 µs (−6.3%)** | 2,249 / 2,398 µs (**+26%**) | 30 / 84.7% |
+
+**Why Full is slower with GCC** (`objdump` of `a2_full_tile<6,4>` on the Pi):
+
+| | instructions | `vmla` | stack references (`sp`) |
+|---|---|---|---|
+| clang 16 | 388 | 128 | 13 |
+| GCC 14 | 581 | 136 | **100** |
+
+GCC spills the kernel's register-blocked tile (8 q accumulators + weights + inputs, sized to ARMv7's 16
+q registers) to the stack, adding ~50% more instructions, mostly loads and stores. The kernel was written
+and checked against clang's register allocator (`asm volatile` fences, `target("no-slowfpvmlx")` is
+clang-only). The Lite kernel is small enough that GCC's scheduling wins there.
+
+**Verdict.** Keep clang for Full (the configuration that needs the speed). GCC would buy Lite 6%,
+which it doesn't need (32% load). A kernel written in inline asm or with GCC-specific register pressure
+tuning could make the two compilers equivalent; not worth it for this project.
