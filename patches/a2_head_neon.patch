@@ -1,0 +1,64 @@
+--- a/NAM/wavenet/a2_fast.cpp	2026-10-25 00:25:02
++++ b/NAM/wavenet/a2_fast.cpp	2026-10-25 00:25:02
+@@ -188,6 +188,30 @@
+   }
+ }
+   #endif // NAM_A2_FULL_NEON
++
++#if defined(__ARM_NEON) && !defined(__aarch64__)
++// Head dot product, length N (48 for Lite, 128 for Full; both multiples of 8). Two accumulators so
++// consecutive VMLAs don't wait on each other's 5-cycle latency (measured on the A7, iteration 7).
++template <int N>
++  #if defined(__clang__)
++__attribute__((noinline, target("no-slowfpvmlx")))
++  #else
++__attribute__((noinline))
++  #endif
++float a2_head_dot(const float* __restrict w, const float* __restrict x)
++{
++  static_assert(N % 8 == 0, "head length must be a multiple of 8");
++  float32x4_t a0 = vdupq_n_f32(0.0f), a1 = vdupq_n_f32(0.0f);
++  for (int i = 0; i < N; i += 8)
++  {
++    a0 = vmlaq_f32(a0, vld1q_f32(w + i), vld1q_f32(x + i));
++    a1 = vmlaq_f32(a1, vld1q_f32(w + i + 4), vld1q_f32(x + i + 4));
++  }
++  const float32x4_t a = vaddq_f32(a0, a1);
++  const float32x2_t s = vadd_f32(vget_low_f32(a), vget_high_f32(a));
++  return vget_lane_f32(vpadd_f32(s, s), 0);
++}
++#endif
+ 
+ // =============================================================================
+ // A2FastModel<Channels>
+@@ -1116,18 +1140,22 @@
+   auto col_of = [&](int f, int k) { return base + f - (kHeadKernelSize - 1 - k); };
+   #endif
+ 
++  // The 16 taps of frame f are 16 consecutive history columns (contiguous in both ring modes: mode 1
++  // reads wrap into the mirrored tail), so each output is one dot product of length 16 * Channels with
++  // the flattened head weights (_head_w is a contiguous array of arrays).
++  constexpr int kLen = kHeadKernelSize * Channels;
++  const float* w = _head_w[0].data();
+   for (int f = 0; f < num_frames; f++)
+   {
++    const float* src = &_head_history[static_cast<size_t>(col_of(f, 0)) * Channels];
++  #if defined(__ARM_NEON) && !defined(__aarch64__)
++    output[f] = (_head_b + a2_head_dot<kLen>(w, src)) * _head_scale;
++  #else
+     float y = _head_b;
+-    for (int k = 0; k < kHeadKernelSize; k++)
+-    {
+-      const int col = col_of(f, k);
+-      const float* src = &_head_history[static_cast<size_t>(col) * Channels];
+-      const float* wk = _head_w[k].data();
+-      for (int b = 0; b < Channels; b++)
+-        y += wk[b] * src[b];
+-    }
++    for (int i = 0; i < kLen; i++)
++      y += w[i] * src[i];
+     output[f] = y * _head_scale;
++  #endif
+   }
+ }
+ 

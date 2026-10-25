@@ -101,7 +101,7 @@ endforeach()
 string(REPLACE ";" "+" _patch_str "${_patch_names}")
 string(REPLACE ";" " " _a2_str "${A2_FLAGS}")
 string(REPLACE ";" " " BUILD_FLAGS_STR
-  "${ARCH_FLAGS} ${OPT_FLAGS} a2_fast=${BENCH_A2_FAST} a2_flags=[${_a2_str}] patches=[${_patch_str}]")
+  "${ARCH_FLAGS} ${OPT_FLAGS} a2_fast=${BENCH_A2_FAST} a2_flags=[${_a2_str}] patches=[${_patch_str}] cxxflags=[${CMAKE_CXX_FLAGS}]")
 target_compile_definitions(bench PRIVATE
   BENCH_BUILD_FLAGS="${CMAKE_CXX_COMPILER_ID}-${CMAKE_CXX_COMPILER_VERSION} ${BUILD_FLAGS_STR}")
 
