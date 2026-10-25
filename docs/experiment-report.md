@@ -358,3 +358,33 @@ scaling (the split puts 91 vs 88 cost units on each side). **Full now runs in re
 samples** in back-to-back mode, with 1.4× p99 headroom, for +2.67 ms latency and a second core spinning.
 The single miss (2.73 ms) shows the tail needs `--rt` and core isolation; paced runs follow.
 Overall Full speedup vs the first baseline: 6,696 → 1,785 µs = **3.75×**.
+
+### Iteration 9: pipelined Full in paced mode, with and without `--rt` (`pipe_full_paced*`)
+
+`npipe` build, `--pipeline 8`, paced, blocks 64/128/256, 2 runs each. With `--rt` the audio thread is
+SCHED_FIFO 80 on CPU 3 and the worker SCHED_FIFO 80 on CPU 2. Throttle flags 0x0, 40 °C afterwards.
+
+| Block (deadline) | p50 | p99 | max | wake p99 | missed (process) | missed incl. wake | load |
+|---|---|---|---|---|---|---|---|
+| 64 (1,333 µs) | 906 | 1,001 | 1,685 | 100 | 14 / 104,100 | **33** | 68.6% |
+| 64, `--rt` | 901 | 989 | 1,438 | **27** | 1 / 104,100 | **1** | 68.2% |
+| 128 (2,667 µs) | 1,796 | 1,914 | 2,433 | 100 | 0 / 52,050 | **0** | 67.8% |
+| 128, `--rt` | 1,789 | 1,901 | 2,766 | 59 | 2 / 52,050 | **2** | 67.5% |
+| 256 (5,333 µs) | 3,610 | 3,779 | 4,733 | 140 | 0 / 26,024 | **0** | 67.8% |
+| 256, `--rt` | 3,591 | 3,753 | 4,609 | 40 | 0 / 26,024 | **0** | 67.4% |
+
+(µs. Source: `results-pi/summary_pipe_full_paced*.csv` → `kpi_by_block.csv`.)
+
+**Findings.**
+- **Full is usable live at 128–256 samples.** At 256: 0 misses in both arms. At 128: 0 misses without
+  `--rt` and 2 with it (2 of 52,050 = 0.004%; the two misses are compute spikes to 2.77 ms, not
+  late wake-ups). With 2 runs each, 0 vs 2 is within noise; neither arm is reliably clean at 128 yet.
+- **At 64 samples, `--rt` matters:** 33 misses → 1, mostly by cutting wake-up p99 from 100 to 27 µs.
+- **Remaining misses are rare compute spikes** (max 2.4–2.8 ms against a p99 of 1.9 ms). The likely
+  sources are interrupts and other tasks on cores 2/3 and contention in the shared L2 between the two
+  stages. Those are what `isolcpus` + IRQ affinity (needs sudo + a reboot) and PREEMPT_RT address.
+- Load is flat at ~68% across block sizes: the pipeline's per-block sync cost is small.
+
+**Status vs the goal.** Full: real time at 128 with a ~1-in-25,000 miss rate; clean at 256 (5.3 ms
+buffer + 5.3 ms pipeline delay). Lite: clean at 32 samples. Next levers for Full's tail: core
+isolation (Christine), a 3-stage pipeline (more latency), or more single-core kernel work.
