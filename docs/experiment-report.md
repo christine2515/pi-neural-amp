@@ -325,3 +325,36 @@ iteration 2 (more instructions per useful MAC from `vld3` and spills) lost, and 
   tight: loads, the bias/activation/1×1 tail and the head all compete for the same in-order pipeline.
 - The other lever is **more cores**: the A7 has four, and three sit idle. A two-stage pipeline
   (roadmap R2-3) doubles available MAC throughput for +1 block of latency.
+
+### Iteration 8: two-core pipeline for Full (`pipe_full`)
+
+**Hypothesis.** Iteration 7 puts a single-core ceiling of ~63% load on Full (at a perfect 1 MAC/cycle),
+and the `neon` kernel reaches 0.47 MACs/cycle (132% load). Squeezing another 1.32× out of one in-order
+core is uncertain (44% of the kernel's sampled cycles sit on loads). Three of the four cores are idle.
+Splitting the 23 layers across two cores should roughly halve the per-call time, for one block of
+extra latency.
+
+**Change.** `patches/a2_pipeline.patch` (on top of both NEON patches and `ring0`; build
+`build-armhf-npipe`). Stage A = input rechannel + layers 0–12 on the calling (audio) thread; stage B =
+layers 13–22 + head on a worker thread. Two buffer sets alternate: during call *n*, the worker runs
+stage B of block *n−1* while the audio thread runs stage A of block *n*, then the audio thread waits
+for the worker and returns block *n−1*'s output. Handoff is two atomics (no locks, no syscalls); the
+worker spin-waits with `yield` and is pinned/prioritized at model load (`bench --pipeline 8`,
+`--pipeline-cpu`, and with `--rt` it gets the same SCHED_FIFO priority). Prewarm runs unpipelined.
+
+**Accuracy.** Output is exactly one block late (128 samples = 2.67 ms). After a 128-sample shift,
+the pipelined render is **bit-identical** to the unpipelined `neon` render, on the Mac and on the Pi
+(`null_test.py --shift 128`).
+
+**Result** (Full, block 128, burst, 3 runs):
+
+| Full | p50 | p99 | max | missed | load | CPU |
+|---|---|---|---|---|---|---|
+| `neon` (1 core) | 3,511 µs | 3,732 µs | 4,491 µs | 100% | 132% | 100% |
+| **`pipe_full` (2 cores)** | **1,785 µs** | **1,928 µs** | 2,734 µs | **1 / 78,075** | **67%** | 200% |
+
+**Verdict: adopt for Full.** 1.97× faster per call than `neon`, which is almost perfect two-way
+scaling (the split puts 91 vs 88 cost units on each side). **Full now runs in real time at 128
+samples** in back-to-back mode, with 1.4× p99 headroom, for +2.67 ms latency and a second core spinning.
+The single miss (2.73 ms) shows the tail needs `--rt` and core isolation; paced runs follow.
+Overall Full speedup vs the first baseline: 6,696 → 1,785 µs = **3.75×**.
