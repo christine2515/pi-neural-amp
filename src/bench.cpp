@@ -75,6 +75,9 @@ struct Args
   std::string renderOut;     // processed audio WAV; empty = skip
   double slim = -1.0;        // slimmable size 0..1; <0 = model default
   bool printSlimSizes = false;
+  std::string pipeline;    // NAM_A2_PIPELINE value ("8", "3", "all"); needs the a2_pipeline patch
+  int pipelineCpu = -1;    // worker core; default 2 when --cpu 3
+  int pipelineSplit = 0;   // first layer of stage B; 0 = patch default
 };
 
 void Usage()
@@ -93,7 +96,11 @@ void Usage()
                "  --first-block-out F  write CLOCK_BOOTTIME at end of first block (boot timing)\n"
                "  --render F.wav       write processed audio\n"
                "  --slim V             slimmable (A2) models: pick the submodel for size V in 0..1\n"
-               "  --print-slim-sizes   print one size value + name per submodel, then exit\n";
+               "  --print-slim-sizes   print one size value + name per submodel, then exit\n"
+               "  --pipeline C         two-core A2 pipeline for channel count C (8 = Full, 3 = Lite, all);\n"
+               "                       output is one block late. Needs a build with patches/a2_pipeline.patch\n"
+               "  --pipeline-cpu N     core for the pipeline worker (default 2 with --cpu 3)\n"
+               "  --pipeline-split L   first layer run by the worker\n";
 }
 
 bool ParseArgs(int argc, char** argv, Args& a)
@@ -141,6 +148,12 @@ bool ParseArgs(int argc, char** argv, Args& a)
       a.slim = std::atof(next("--slim"));
     else if (s == "--print-slim-sizes")
       a.printSlimSizes = true;
+    else if (s == "--pipeline")
+      a.pipeline = next("--pipeline");
+    else if (s == "--pipeline-cpu")
+      a.pipelineCpu = std::atoi(next("--pipeline-cpu"));
+    else if (s == "--pipeline-split")
+      a.pipelineSplit = std::atoi(next("--pipeline-split"));
     else if (s == "-h" || s == "--help")
       return false;
     else
@@ -192,6 +205,23 @@ int main(int argc, char** argv)
   }
   if (!a.printSlimSizes && !CsvHeaderMatches(a.summaryOut, kSummaryHeader))
     return 2;
+
+  // The pipeline worker starts when the model is constructed, so configure it first.
+  if (!a.pipeline.empty())
+  {
+    if (std::strstr(BENCH_BUILD_FLAGS, "a2_pipeline") == nullptr)
+    {
+      std::cerr << "--pipeline needs a build with patches/a2_pipeline.patch\n";
+      return 2;
+    }
+    if (a.pipelineCpu < 0 && a.cpu == 3)
+      a.pipelineCpu = 2;
+    setenv("NAM_A2_PIPELINE", a.pipeline.c_str(), 1);
+    setenv("NAM_A2_PIPELINE_CPU", std::to_string(a.pipelineCpu).c_str(), 1);
+    setenv("NAM_A2_PIPELINE_PRIO", std::to_string(a.rt ? a.rtPrio : 0).c_str(), 1);
+    if (a.pipelineSplit > 0)
+      setenv("NAM_A2_PIPELINE_SPLIT", std::to_string(a.pipelineSplit).c_str(), 1);
+  }
 
   // ---- Load model (timed: part of "boot to ready") ----
   const auto tLoad0 = Clock::now();
@@ -373,6 +403,8 @@ int main(int argc, char** argv)
   std::string modelName = std::filesystem::path(a.model).filename().string();
   if (a.slim >= 0.0)
     modelName += "@" + SlimVariantName(breakpoints, a.slim);
+  if (!a.pipeline.empty())
+    modelName += "+pipe" + (a.pipelineSplit > 0 ? std::to_string(a.pipelineSplit) : std::string());
 
   // Memory, read once the loop is done.
   const long pssKb = SelfMemKb("Pss");

@@ -1,0 +1,391 @@
+--- a/NAM/wavenet/a2_fast.cpp	2026-10-24 20:20:10
++++ b/NAM/wavenet/a2_fast.cpp	2026-10-24 20:20:57
+@@ -25,6 +25,14 @@
+   #include <string>
+   #include <utility>
+   #include <vector>
++
++  #include <atomic>
++  #include <cstdlib>
++  #include <thread>
++  #if defined(__linux__)
++    #include <pthread.h>
++    #include <sched.h>
++  #endif
+ 
+   #include <Eigen/Dense>
+ 
+@@ -207,7 +215,12 @@
+   static constexpr int kHeadIn = Channels;
+ 
+   A2FastModel(std::vector<float> weights, double expected_sample_rate);
+-  ~A2FastModel() override = default;
++  ~A2FastModel() override
++  {
++    _stop.store(true, std::memory_order_release);
++    if (_worker.joinable())
++      _worker.join();
++  }
+ 
+   void process(NAM_SAMPLE** input, NAM_SAMPLE** output, int num_frames) override;
+   void prewarm() override;
+@@ -289,13 +302,37 @@
+   int _head_write_pos = 0;
+   #endif
+ 
+-  // Working buffers (all Channels rows, max_buffer_size cols, col-major).
+-  std::vector<float> _layer_in; // current layer input / next layer input (in-place residual)
+-  std::vector<float> _head_sum; // accumulates activations across all layers
+-  std::vector<float> _z; // per-layer conv output accumulator (tap-major)
+-  std::vector<float> _cond; // float32 copy of the double NAM_SAMPLE input, reused each block
+-  std::vector<float> _head_out; // float32 head output before writing to NAM_SAMPLE
++  // Working buffers (all Channels rows, max_buffer_size cols, col-major). Two sets so a two-stage
++  // pipeline can run stage A on block n while stage B finishes block n-1 on another core. Each thread
++  // points tl_b at the set it works on; layer/head code reads the buffers through it.
++  struct Bufs
++  {
++    std::vector<float> layer_in; // current layer input / next layer input (in-place residual)
++    std::vector<float> head_sum; // accumulates activations across all layers
++    std::vector<float> z; // per-layer conv output accumulator (tap-major)
++    std::vector<float> cond; // float32 copy of the NAM_SAMPLE input, reused each block
++    std::vector<float> head_out; // float32 head output before writing to NAM_SAMPLE
++    int num_frames = 0;
++  };
++  std::array<Bufs, 2> _sets;
++  inline static thread_local Bufs* tl_b = nullptr;
+ 
++  // Two-stage pipeline (NAM_A2_PIPELINE=1 in the environment at load time). Stage A = rechannel +
++  // layers [0, split); stage B = layers [split, kNumLayers) + head. Output is one block late.
++  bool _pipe_enabled = false;
++  bool _in_prewarm = false;
++  bool _have_prev = false;
++  int _pipe_split = 13;
++  unsigned _seq = 0;
++  std::atomic<unsigned> _job{0}; // incremented by the audio thread to hand stage B to the worker
++  std::atomic<unsigned> _done{0}; // set to _job's value by the worker when stage B is finished
++  std::atomic<bool> _stop{false};
++  int _job_set = 0;
++  std::thread _worker;
++  void _stage_a(const NAM_SAMPLE* in0, int num_frames);
++  void _stage_b();
++  void _worker_main(int cpu, int prio);
++
+   int _prewarm_samples = 0;
+   bool _has_cached_prewarm_state = false;
+ 
+@@ -362,6 +399,24 @@
+     prewarm += _layers[i].max_lookback;
+   prewarm += kHeadKernelSize - 1;
+   _prewarm_samples = prewarm;
++
++  // NAM_A2_PIPELINE: "8" (Full), "3" (Lite), "all", or unset/"0" (off). Only the listed sizes start a
++  // worker, so loading an A2 file with both submodels doesn't leave two cores spinning.
++  if (const char* pe = std::getenv("NAM_A2_PIPELINE"))
++  {
++    const std::string v(pe);
++    _pipe_enabled = v == "all" || v == "1" || v.find(std::to_string(Channels)) != std::string::npos;
++  }
++  if (_pipe_enabled)
++  {
++    if (const char* sp = std::getenv("NAM_A2_PIPELINE_SPLIT"))
++      _pipe_split = std::max(1, std::min(kNumLayers - 1, std::atoi(sp)));
++    const char* c = std::getenv("NAM_A2_PIPELINE_CPU");
++    const char* r = std::getenv("NAM_A2_PIPELINE_PRIO");
++    const int cpu = c ? std::atoi(c) : -1;
++    const int prio = r ? std::atoi(r) : 0;
++    _worker = std::thread([this, cpu, prio] { _worker_main(cpu, prio); });
++  }
+ }
+ 
+ // -----------------------------------------------------------------------------
+@@ -477,11 +532,16 @@
+ {
+   DSP::SetMaxBufferSize(maxBufferSize);
+ 
+-  _layer_in.assign(static_cast<size_t>(Channels) * maxBufferSize, 0.0f);
+-  _head_sum.assign(static_cast<size_t>(Channels) * maxBufferSize, 0.0f);
+-  _z.assign(static_cast<size_t>(Channels) * maxBufferSize, 0.0f);
+-  _cond.assign(static_cast<size_t>(maxBufferSize), 0.0f);
+-  _head_out.assign(static_cast<size_t>(maxBufferSize), 0.0f);
++  for (Bufs& b : _sets)
++  {
++    b.layer_in.assign(static_cast<size_t>(Channels) * maxBufferSize, 0.0f);
++    b.head_sum.assign(static_cast<size_t>(Channels) * maxBufferSize, 0.0f);
++    b.z.assign(static_cast<size_t>(Channels) * maxBufferSize, 0.0f);
++    b.cond.assign(static_cast<size_t>(maxBufferSize), 0.0f);
++    b.head_out.assign(static_cast<size_t>(maxBufferSize), 0.0f);
++    b.num_frames = 0;
++  }
++  _have_prev = false; // histories restart, so there is no block in flight
+ 
+   for (auto& L : _layers)
+   {
+@@ -526,7 +586,10 @@
+     return;
+   }
+ 
++  _in_prewarm = true;
+   DSP::prewarm();
++  _in_prewarm = false;
++  _have_prev = false;
+   CacheStateAsPrewarmed();
+ }
+ 
+@@ -591,7 +654,7 @@
+   #if NAM_A2_RING_MODE == 1
+   const int mbs = GetMaxBufferSize();
+   float* const hist = L.history.data();
+-  const float* const src = _layer_in.data();
++  const float* const src = tl_b->layer_in.data();
+   const int wp = L.write_pos;
+   const int first = std::min(num_frames, L.pow2_size - wp);
+   std::memcpy(hist + static_cast<size_t>(wp) * Channels, src, static_cast<size_t>(first) * Channels * sizeof(float));
+@@ -611,7 +674,7 @@
+                  static_cast<size_t>(keep) * Channels * sizeof(float));
+     L.write_pos = keep;
+   }
+-  std::memcpy(L.history.data() + static_cast<size_t>(L.write_pos) * Channels, _layer_in.data(),
++  std::memcpy(L.history.data() + static_cast<size_t>(L.write_pos) * Channels, tl_b->layer_in.data(),
+               static_cast<size_t>(num_frames) * Channels * sizeof(float));
+   L.write_pos += num_frames;
+   #endif
+@@ -623,7 +686,7 @@
+   #if NAM_A2_RING_MODE == 1
+   const int mbs = GetMaxBufferSize();
+   float* const hist = _head_history.data();
+-  const float* const src = _head_sum.data();
++  const float* const src = tl_b->head_sum.data();
+   const int wp = _head_write_pos;
+   const int first = std::min(num_frames, _head_pow2_size - wp);
+   std::memcpy(hist + static_cast<size_t>(wp) * Channels, src, static_cast<size_t>(first) * Channels * sizeof(float));
+@@ -643,7 +706,7 @@
+                  static_cast<size_t>(keep) * Channels * sizeof(float));
+     _head_write_pos = keep;
+   }
+-  std::memcpy(_head_history.data() + static_cast<size_t>(_head_write_pos) * Channels, _head_sum.data(),
++  std::memcpy(_head_history.data() + static_cast<size_t>(_head_write_pos) * Channels, tl_b->head_sum.data(),
+               static_cast<size_t>(num_frames) * Channels * sizeof(float));
+   _head_write_pos += num_frames;
+   #endif
+@@ -770,9 +833,9 @@
+   #endif // NAM_A2_LITE_NEON
+ 
+ // -----------------------------------------------------------------------------
+-// Per-layer forward pass. Reads current _layer_in, writes back into _layer_in
++// Per-layer forward pass. Reads current tl_b->layer_in, writes back into tl_b->layer_in
+ // after applying dilated conv + mixin + LeakyReLU + layer1x1 residual, and
+-// accumulates activations into _head_sum.
++// accumulates activations into tl_b->head_sum.
+ // -----------------------------------------------------------------------------
+ // Compile-time-specialized per-layer kernel. KernelSize is a template param
+ // so the K tap loop + per-tap weight offsets become compile-time constants;
+@@ -826,8 +889,8 @@
+         for (int k = 0; k < K; k++)
+           taps[k] = tap0[k] + f_begin * 3;
+         a2_lite_tile4<K>(taps, L.conv_w4.data(), L.conv_b4.data(), L.mixin_w4.data(), L.l1x1_w4.data(),
+-                         L.l1x1_b4.data(), cond + f_begin, &_head_sum[static_cast<size_t>(f_begin) * 3],
+-                         &_layer_in[static_cast<size_t>(f_begin) * 3], kLeakySlope);
++                         L.l1x1_b4.data(), cond + f_begin, &tl_b->head_sum[static_cast<size_t>(f_begin) * 3],
++                         &tl_b->layer_in[static_cast<size_t>(f_begin) * 3], kLeakySlope);
+       }
+     }
+   #endif
+@@ -835,7 +898,7 @@
+     // before the frame loop, the c-reduction kept in scalar temps a0/a1/a2 so
+     // the compiler keeps them in FP registers across the frame loop. Mirrors
+     // the nam2c --fused structure.
+-    float* z = _z.data();
++    float* z = tl_b->z.data();
+ 
+     // Tap 0: seed z with conv_b (saves the memset-to-zero pass) and fold in
+     // the first tap's FMAs.
+@@ -929,12 +992,12 @@
+       a1 = (a1 >= 0.0f) ? a1 : a1 * kLeakySlope;
+       a2 = (a2 >= 0.0f) ? a2 : a2 * kLeakySlope;
+       // Head sum accumulate.
+-      float* hsum = &_head_sum[static_cast<size_t>(f) * 3];
++      float* hsum = &tl_b->head_sum[static_cast<size_t>(f) * 3];
+       hsum[0] += a0;
+       hsum[1] += a1;
+       hsum[2] += a2;
+       // layer1x1 residual.
+-      float* lin = &_layer_in[static_cast<size_t>(f) * 3];
++      float* lin = &tl_b->layer_in[static_cast<size_t>(f) * 3];
+       lin[0] += lb0 + lw00 * a0 + lw10 * a1 + lw20 * a2;
+       lin[1] += lb1 + lw01 * a0 + lw11 * a1 + lw21 * a2;
+       lin[2] += lb2 + lw02 * a0 + lw12 * a1 + lw22 * a2;
+@@ -950,8 +1013,8 @@
+     for (int k = 0; k < K; k++)
+       tap0[k] = &L.history[static_cast<size_t>(tap_base_phys(K - 1 - k)) * 8];
+     const float* cw = L.conv_w.data();
+-    float* hs = _head_sum.data();
+-    float* li = _layer_in.data();
++    float* hs = tl_b->head_sum.data();
++    float* li = tl_b->layer_in.data();
+     int f = 0;
+     for (; f + 4 <= num_frames; f += 4)
+     {
+@@ -997,9 +1060,9 @@
+     Eigen::Map<const VecC> l1x1_b_vec(L.l1x1_b.data());
+     Eigen::Map<const RowDyn> cond_row(cond, 1, num_frames);
+ 
+-    Eigen::Map<MatCDyn> ztile(_z.data(), Channels, num_frames);
+-    Eigen::Map<MatCDyn> hsum_block(_head_sum.data(), Channels, num_frames);
+-    Eigen::Map<MatCDyn> lin_block(_layer_in.data(), Channels, num_frames);
++    Eigen::Map<MatCDyn> ztile(tl_b->z.data(), Channels, num_frames);
++    Eigen::Map<MatCDyn> hsum_block(tl_b->head_sum.data(), Channels, num_frames);
++    Eigen::Map<MatCDyn> lin_block(tl_b->layer_in.data(), Channels, num_frames);
+ 
+     ztile.setZero();
+ 
+@@ -1072,39 +1135,134 @@
+ // DSP::process override
+ // -----------------------------------------------------------------------------
+ template <int Channels>
+-void A2FastModel<Channels>::process(NAM_SAMPLE** input, NAM_SAMPLE** output, int num_frames)
++void A2FastModel<Channels>::_stage_a(const NAM_SAMPLE* in0, int num_frames)
+ {
+-  if (num_frames > GetMaxBufferSize())
+-    SetMaxBufferSize(num_frames);
+-
+-  const NAM_SAMPLE* in0 = input[0];
+-  NAM_SAMPLE* out0 = output[0];
+-
+   // Rechannel: layer_in[c, f] = _rechannel_w[c] * input[f] for c in Channels.
+   // Also prepare float cond buffer (input copied to float for inner loops).
+-  float* cond = _cond.data();
++  tl_b->num_frames = num_frames;
++  float* cond = tl_b->cond.data();
+   for (int f = 0; f < num_frames; f++)
+   {
+     const float x = static_cast<float>(in0[f]);
+     cond[f] = x;
+-    float* lin = &_layer_in[static_cast<size_t>(f) * Channels];
++    float* lin = &tl_b->layer_in[static_cast<size_t>(f) * Channels];
+     for (int c = 0; c < Channels; c++)
+       lin[c] = _rechannel_w[c] * x;
+   }
+ 
+   // Zero head accumulator.
+-  std::memset(_head_sum.data(), 0, static_cast<size_t>(num_frames) * Channels * sizeof(float));
++  std::memset(tl_b->head_sum.data(), 0, static_cast<size_t>(num_frames) * Channels * sizeof(float));
+ 
+-  for (int li = 0; li < kNumLayers; li++)
++  const int split = (_pipe_enabled && !_in_prewarm) ? _pipe_split : kNumLayers;
++  for (int li = 0; li < split; li++)
+     _layer_forward(li, cond, num_frames);
++}
+ 
+-  // Output.
+-  float* head_out = _head_out.data();
+-  _head_forward(head_out, num_frames);
+-  for (int f = 0; f < num_frames; f++)
+-    out0[f] = static_cast<NAM_SAMPLE>(head_out[f]);
++template <int Channels>
++void A2FastModel<Channels>::_stage_b()
++{
++  const int n = tl_b->num_frames;
++  const int split = (_pipe_enabled && !_in_prewarm) ? _pipe_split : kNumLayers;
++  for (int li = split; li < kNumLayers; li++)
++    _layer_forward(li, tl_b->cond.data(), n);
++  _head_forward(tl_b->head_out.data(), n);
+ }
+ 
++template <int Channels>
++void A2FastModel<Channels>::_worker_main(int cpu, int prio)
++{
++  #if defined(__linux__)
++  if (cpu >= 0)
++  {
++    cpu_set_t set;
++    CPU_ZERO(&set);
++    CPU_SET(cpu, &set);
++    pthread_setaffinity_np(pthread_self(), sizeof(set), &set);
++  }
++  if (prio > 0)
++  {
++    sched_param sp{};
++    sp.sched_priority = prio;
++    pthread_setschedparam(pthread_self(), SCHED_FIFO, &sp);
++  }
++  #else
++  (void)cpu;
++  (void)prio;
++  #endif
++  unsigned seen = 0;
++  while (!_stop.load(std::memory_order_acquire))
++  {
++    const unsigned job = _job.load(std::memory_order_acquire);
++    if (job == seen)
++    {
++  #if defined(__arm__) || defined(__aarch64__)
++      asm volatile("yield");
++  #endif
++      continue;
++    }
++    seen = job;
++    tl_b = &_sets[_job_set];
++    _stage_b();
++    _done.store(job, std::memory_order_release);
++  }
++}
++
++template <int Channels>
++void A2FastModel<Channels>::process(NAM_SAMPLE** input, NAM_SAMPLE** output, int num_frames)
++{
++  if (num_frames > GetMaxBufferSize())
++    SetMaxBufferSize(num_frames);
++
++  const NAM_SAMPLE* in0 = input[0];
++  NAM_SAMPLE* out0 = output[0];
++
++  if (!_pipe_enabled || _in_prewarm)
++  {
++    tl_b = &_sets[0];
++    _stage_a(in0, num_frames);
++    _stage_b();
++    const float* head_out = tl_b->head_out.data();
++    for (int f = 0; f < num_frames; f++)
++      out0[f] = static_cast<NAM_SAMPLE>(head_out[f]);
++    return;
++  }
++
++  // Pipelined: hand block n-1's stage B to the worker, run block n's stage A here, then wait.
++  const int cur = static_cast<int>(_seq & 1u);
++  const bool had_prev = _have_prev;
++  unsigned job = 0;
++  if (had_prev)
++  {
++    _job_set = cur ^ 1;
++    job = _job.load(std::memory_order_relaxed) + 1;
++    _job.store(job, std::memory_order_release);
++  }
++  tl_b = &_sets[cur];
++  _stage_a(in0, num_frames);
++  if (had_prev)
++  {
++    while (_done.load(std::memory_order_acquire) != job)
++    {
++  #if defined(__arm__) || defined(__aarch64__)
++      asm volatile("yield");
++  #endif
++    }
++    const Bufs& prev = _sets[cur ^ 1];
++    const int n = std::min(prev.num_frames, num_frames);
++    for (int f = 0; f < n; f++)
++      out0[f] = static_cast<NAM_SAMPLE>(prev.head_out[f]);
++    for (int f = n; f < num_frames; f++)
++      out0[f] = 0;
++  }
++  else
++  {
++    for (int f = 0; f < num_frames; f++)
++      out0[f] = 0;
++  }
++  _have_prev = true;
++  _seq++;
++}
++
+ // -----------------------------------------------------------------------------
+ // A2FastConfig — wraps the constructed DSP behind the ModelConfig interface.
+ // -----------------------------------------------------------------------------

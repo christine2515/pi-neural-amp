@@ -71,6 +71,8 @@ def main():
     ap.add_argument("reference")
     ap.add_argument("candidate")
     ap.add_argument("--label", default="")
+    ap.add_argument("--shift", type=int, default=0,
+                    help="candidate is this many samples late (e.g. one block for the A2 pipeline); compare aligned")
     ap.add_argument("--out", default=os.path.join(RESULTS, "null_tests.csv"))
     args = ap.parse_args()
 
@@ -78,8 +80,10 @@ def main():
     rate_b, b = read_wav(args.candidate)
     if rate_a != rate_b:
         raise SystemExit(f"sample rates differ: {rate_a} vs {rate_b}")
+    if args.shift:
+        b = b[args.shift:]
     n = min(len(a), len(b))
-    if len(a) != len(b):
+    if len(a) != len(b) and not args.shift:
         print(f"warning: lengths differ ({len(a)} vs {len(b)}); comparing first {n} samples")
     diff = [a[i] - b[i] for i in range(n)]
     max_abs = max((abs(d) for d in diff), default=0.0)
@@ -90,7 +94,7 @@ def main():
     row = {
         "unix_time": int(time.time()), "label": args.label,
         "reference": os.path.basename(args.reference), "candidate": os.path.basename(args.candidate),
-        "samples": n, "max_abs_diff": f"{max_abs:.3e}", "max_abs_diff_dbfs": f"{db(max_abs):.1f}",
+        "samples": n, "shift": args.shift, "max_abs_diff": f"{max_abs:.3e}", "max_abs_diff_dbfs": f"{db(max_abs):.1f}",
         "rms_diff": f"{rms_diff:.3e}", "residual_db_rel_ref": f"{rel_db:.1f}",
     }
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
