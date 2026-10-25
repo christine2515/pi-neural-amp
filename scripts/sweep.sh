@@ -10,6 +10,7 @@
 #   MODE=paced            paced (sleep to each deadline, like an audio callback) or burst (back to back)
 #   EXTRA=""              extra bench flags, e.g. "--rt --cpu 3"
 #   KEEP_BLOCKS=1         write per-block CSVs to results/blocks/$TAG/
+#   SLIM="lite full"      only these A2 submodels (default: all; non-A2 models are skipped when set)
 #   MEM_SAMPLE=0          1 = also run mem_sampler.sh alongside bench (a PSS/CPU time series). Off by
 #                         default: bench records its own PSS, and the sampler may perturb timings.
 #
@@ -47,6 +48,7 @@ for model in "${MODELS[@]}"; do
   variants=$("$BENCH" --model "$model" --print-slim-sizes)
   [ -n "$variants" ] || variants="- -"
   while read -r slim vname <&3; do
+    if [ -n "${SLIM:-}" ] && [[ " $SLIM " != *" $vname "* ]]; then continue; fi
     mname=$(basename "$model" .nam)
     slim_args=()
     if [ "$slim" != "-" ]; then

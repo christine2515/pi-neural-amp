@@ -1,0 +1,20 @@
+--- a/NAM/wavenet/a2_fast.cpp	2026-10-24 18:00:01
++++ b/NAM/wavenet/a2_fast.cpp	2026-10-24 18:00:01
+@@ -667,7 +667,7 @@
+       const int tap_base = tap_base_phys(K - 1 - k);
+       Eigen::Map<const MatCC> W(&L.conv_w[static_cast<size_t>(k) * Channels * Channels]);
+       Eigen::Map<const MatCDyn> input_block(&L.history[static_cast<size_t>(tap_base) * Channels], Channels, num_frames);
+-      ztile.noalias() += W * input_block;
++      ztile.noalias() += W.lazyProduct(input_block); // coefficient-based: no GEMM packing
+     }
+ 
+     // Post-conv: bias, mixin, LeakyReLU, head_sum, 1x1 residual — all block ops.
+@@ -675,7 +675,7 @@
+     ztile.noalias() += mixin_vec * cond_row; // rank-1 outer product
+     ztile = (ztile.array() < 0.0f).select(ztile.array() * kLeakySlope, ztile.array());
+     hsum_block += ztile;
+-    lin_block.noalias() += l1x1_mat * ztile; // 8x8 × 8xN GEMM
++    lin_block.noalias() += l1x1_mat.lazyProduct(ztile); // coefficient-based: no GEMM packing
+     lin_block.colwise() += l1x1_b_vec;
+   }
+ }

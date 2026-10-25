@@ -13,3 +13,6 @@ __pycache__/
 audio/raw/
 .sysroot/
 build-armhf*/
+results-pi/blocks/
+results-pi/*.wav
+results-pi/*.data*
