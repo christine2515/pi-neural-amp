@@ -218,3 +218,110 @@ Full (max difference 0). Ring mode only changes where history lives, not the ari
 
 **Verdict: adopt.** First positive result, and it's free: a compile flag, identical output, faster on
 average and in the tail for Lite, neutral for Full. **`ring0` is the reference build from here on.**
+
+### Iteration 5: Lite's smallest buffer, paced, with and without `--rt` (`lite_paced`, `lite_paced_rt`)
+
+**Question.** Back-to-back mode says Lite has 2.4× headroom at 128. How small can the block go in a
+realistic callback pattern (sleep until each deadline, `--paced`), and what does real-time
+scheduling buy? `--paced` also measures **wake-up latency**: how late the thread wakes after each sleep.
+A block counts as "missed with wake" when wake lateness + process time exceeds the deadline.
+
+**Setup.** `ring0` build, Lite, blocks 16/32/64/128, 2 runs each (each run = the 69 s file in real time).
+`--rt` = SCHED_FIFO priority 80 + pinned to CPU 3 + `mlockall`. Stock kernel (PREEMPT_VOLUNTARY), no
+isolcpus.
+
+| Block (deadline) | p50 | p99 | max | wake p99 | wake max | missed (process) | missed incl. wake |
+|---|---|---|---|---|---|---|---|
+| 16 (333 µs) | 136 | 179 | 390 | 73 | 313 | 4 / 416,400 | **72** |
+| 16, `--rt` | 135 | 173 | 343 | **16** | 154 | 2 / 416,400 | **4** |
+| 32 (667 µs) | 260 | 304 | 473 | 76 | 290 | 0 | 0 |
+| 32, `--rt` | 258 | 299 | 564 | **24** | 179 | 0 | 0 |
+| 64 (1,333 µs) | 504 | 562 | 962 | 78 | 258 | 0 | 0 |
+| 64, `--rt` | 502 | 555 | 810 | **19** | 139 | 0 | 0 |
+| 128 (2,667 µs) | 998 | 1,062 | 1,278 | 80 | 213 | 0 | 0 |
+| 128, `--rt` | 997 | 1,078 | 1,237 | **20** | 107 | 0 | 0 |
+
+(µs. Source: `results-pi/summary_lite_paced*.csv` → `kpi_by_block.csv`.)
+
+**Findings.**
+- **Smallest glitch-free block for Lite: 32 samples (0.67 ms)**, with or without `--rt`, 0 misses in
+  208,200 blocks. At 16 samples it fails both ways.
+- **`--rt` cuts wake-up latency ~4× at p99** (73–80 → 16–24 µs) and roughly halves the worst case. At
+  16 samples that turns 72 deadline misses into 4. It doesn't change compute time (p50 within 1%).
+- **Per-sample cost rises at small blocks** (p50 per sample: 8.5 µs at 16 vs 7.8 µs at 128): fixed
+  per-call overhead. At 16 samples, compute p99 alone is 52% of the deadline before scheduling noise.
+- What's left at 16 + `--rt` (4 misses, 154 µs worst wake) is what isolcpus / PREEMPT_RT target.
+- The model's 0.67 ms block is far below the Scarlett's USB floor (Reddit reports ~2–3 ms round
+  trip), so the live round-trip test will likely show the interface, not the model, sets Lite's latency.
+
+### Iteration 6: register-blocked NEON kernels for Full and Lite (`neon`)
+
+**Hypothesis.** Iterations 1–3 showed Full loses its time to Eigen's per-call packing and to weight
+reloads, and Lite to scalar code plus, with fast-math, `vld3` and spills. Round-2 research also found
+clang models `cortex-a7` as slow at VMLA and splits it into `vmul` + `vadd`. A hand-written kernel that
+keeps accumulators in registers across all taps, uses VMLA explicitly, and never de-interleaves should win.
+
+**Change.** `patches/a2_full_neon_tile.patch` (Full: 8 output channels × 4 frames per tile, all taps +
+bias + mixin + LeakyReLU + head sum + 1×1 fused, 8 q accumulators) and `patches/a2_lite_neon_lanes.patch`
+(Lite: 3 output channels in lanes, 4-frame tiles, no `vld3`), stacked on `ring0`. Build `build-armhf-nboth`.
+
+**Result** (block 128, burst, 3 runs):
+
+| | p50 | p99 | max | load | vs `ring0` |
+|---|---|---|---|---|---|
+| Full, `ring0` | 6,712 µs | 6,940 µs | 7,810 µs | 252% | — |
+| **Full, `neon`** | **3,511 µs** | **3,732 µs** | 4,491 µs | **132%** | **1.91× faster** |
+| Lite, `ring0` | 991 µs | 1,067 µs | 1,405 µs | 37.4% | — |
+| **Lite, `neon`** | **849 µs** | **921 µs** | 1,246 µs | **32.1%** | **1.17× faster** |
+
+**Accuracy (on the Pi).** 10 s renders vs `ring0`: **Lite bit-identical**; **Full −132.8 dB** relative
+(max sample difference −131.4 dBFS), from a different summation order. Far below audibility.
+
+**Profile** (`results-pi/perf/perf_neon/`, 20 s of audio):
+
+| | Full `ring0`-era baseline | Full `neon` | Lite baseline | Lite `neon` |
+|---|---|---|---|---|
+| instructions | 21.38 G | **6.55 G** | 6.63 G | **2.05 G** |
+| cycles | 45.53 G | 24.24 G | 7.46 G | 6.12 G |
+| IPC | 0.47 | 0.27 | 0.89 | 0.34 |
+| MACs per cycle | 0.25 | **0.47** | 0.23 | 0.28 |
+
+Full now spends 92% of its time in the two kernel instantiations (`a2_full_tile<6,4>` 78%,
+`<15,4>` 15%). Lite: `a2_lite_tile4` 83%, `memcpy` 4%.
+
+**Verdict: adopt.** Full nearly halved, but it still needs **1.32×** more to run in real time.
+Lower IPC is expected now: most remaining instructions are 4-cycle NEON q operations (iteration 7).
+
+### Iteration 7: what the Cortex-A7 can actually do (`neon_peak`)
+
+**Why.** Instruction counts fell much more than cycles in iterations 2 and 6, so the cost per
+instruction matters. I couldn't find a citable A7 timing table, so I measured it.
+
+**Method.** `src/neon_peak.cpp`: for each instruction form, a loop of 8 instructions written in inline
+asm (so the compiler can't substitute), 160 M instructions, `--rt` on CPU 3, cycles = time × 900 MHz.
+"Independent" = 8 different accumulators (throughput); "chain" = all on one accumulator (latency).
+Source: `results-pi/neon_peak.csv`.
+
+| Instruction (f32) | cycles / instr | float ops / cycle |
+|---|---|---|
+| `vmla` q (by scalar or by vector), `vfma` q, `vmul` q, `vadd` q | 4.13 | **0.97** |
+| `vmla` d, `vfma` d | 2.13 | **0.94** |
+| scalar VFP `vmla` s, `vfma` s | 1.13 | **0.89** |
+| `vmla` q / d dependent chain | 5.01 | (latency 5 cycles) |
+| `vadd` q dependent chain | 4.13 | |
+
+**Finding: on the Cortex-A7, every FP form peaks at ~1 float operation per cycle.** A 4-lane q
+instruction takes 4 cycles, a 2-lane d instruction 2, scalar 1. NEON doesn't multiply arithmetic
+throughput here (the NEON/VFP unit appears to process one 32-bit lane per cycle). What vectorizing
+*can* still do is cut loads, address math and loop overhead around the MACs. That explains why
+iteration 2 (more instructions per useful MAC from `vld3` and spills) lost, and why iteration 6 won
+(fewer instructions per MAC).
+
+**What it means for Full** (from these measurements; ceilings are arithmetic, not measured):
+- Single-core ceiling: 11,776 MACs per sample at ~1 MAC/cycle ≈ 11,800 cycles ≈ **13.1 µs per sample**
+  vs the 20.8 µs budget, i.e. **~63% load at best** on one core.
+- `neon` runs at 0.47 MACs/cycle (27.4 µs per sample, 132% load). Real time needs ≥0.63 MACs/cycle,
+  so the kernel must spend ≥75% of cycles issuing MACs (today ~48%). That's possible in principle but
+  tight: loads, the bias/activation/1×1 tail and the head all compete for the same in-order pipeline.
+- The other lever is **more cores**: the A7 has four, and three sit idle. A two-stage pipeline
+  (roadmap R2-3) doubles available MAC throughput for +1 block of latency.

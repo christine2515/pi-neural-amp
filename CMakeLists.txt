@@ -115,3 +115,12 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(WARNING "ALSA not found: skipping live (sudo apt install libasound2-dev)")
   endif()
 endif()
+
+# neon_peak: measured NEON/VFP throughput and latency (ARMv7 builds only).
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(armv7|armhf|arm$)")
+  add_executable(neon_peak src/neon_peak.cpp)
+  target_compile_options(neon_peak PRIVATE ${ARCH_FLAGS} -O2)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_libraries(neon_peak PRIVATE Threads::Threads)
+  endif()
+endif()
