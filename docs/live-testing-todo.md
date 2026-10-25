@@ -22,20 +22,20 @@ Everything writes CSV to `results/`; analysis goes into `docs/experiment-report.
       locks the worker thread's whole default stack (`ulimit -s` = 8 MB). Fix: create the worker with a
       small explicit stack (pthread attr in `a2_pipeline.patch`), then re-measure. Fix before quoting memory.
 
-## 1. Hardware setup 🧑
-- [ ] Plug the Scarlett into the Pi's USB. If it crackles or drops out, use a powered USB hub.
+## 1. Hardware setup 🧑 (Scarlett Solo 3rd gen connected 2026-10-25; guitar = capture channel 1; ⚠️ under-voltage seen at plug-in; need a ¼" headphone adapter and an RCA → ¼" loopback cable)
+- [x] Plug the Scarlett into the Pi's USB. If it crackles or drops out, use a powered USB hub.
 - [ ] **Direct Monitor OFF**, input 1 set to **INST**, gain low to start, headphones on the headphone out.
 - [ ] Keep Ethernet plugged in (we need SSH), but don't stream anything during runs.
 - [ ] Tape the microSD card in (it popped out once).
 
-## 2. Device checks 🤖 (read-only)
+## 2. Device checks 🤖 (read-only) ✅ hw:USB, 480M, S32_LE 2/2 ch, sync endpoints, 125 µs packets
 - [ ] `arecord -l` / `aplay -l`: card name (expected `USB` → `DEVICE=hw:USB`).
 - [ ] `lsusb -t`: the Scarlett should show **480M** (high speed). 12M would mean split transactions
       through the Pi 2's hub, which is the worst case for the USB driver.
 - [ ] `cat /proc/asound/card*/stream0`: formats, rates, channels, endpoint interval.
 - [ ] `vcgencmd get_throttled` once, before starting: `0x0`. Power is OK with the Scarlett attached.
 
-## 3. First sound 🧑 + 🤖
+## 3. First sound 🧑 + 🤖 (timing ✅: 0 underruns for bypass/Lite/Full at 128×2, Lite 32×2, Full pipe 64×2; listening pending headphones)
 - [ ] `live --bypass --period 128 --periods 2 --duration 20`: you should hear your dry guitar. Checks
       the wiring, channel and format.
 - [ ] `live --model … --slim 0.25 --period 128 --duration 60`: **Lite. Play it.** Does it sound like the

@@ -591,3 +591,41 @@ clang-only). The Lite kernel is small enough that GCC's scheduling wins there.
 **Verdict.** Keep clang for Full (the configuration that needs the speed). GCC would buy Lite 6%,
 which it doesn't need (32% load). A kernel written in inline asm or with GCC-specific register pressure
 tuning could make the two compilers equivalent; not worth it for this project.
+
+
+## Live: Scarlett Solo 3rd gen on the Pi (`live`, `nhead` build)
+
+**Setup.** Scarlett Solo 3rd gen (`hw:USB`), USB 2.0 high speed (480M), synchronous endpoints (no
+implicit feedback), 125 µs packet interval, S32_LE, 2 in / 2 out, 48 kHz. Guitar in input 2 (INST),
+which is **capture channel 1**. Level check (90 s `arecord`, `results/x_level_check.wav` on the Pi):
+guitar peaks −6.8 to −2.7 dBFS, 0 clipped samples; input 1 (empty) at a −91 dBFS noise floor.
+**Power warning:** `vcgencmd get_throttled` = `0x50000` (under-voltage and throttling occurred since
+boot; the kernel logged "Voltage normalised" as the Solo connected). Use a stronger supply or a powered hub.
+No headphones yet (the Solo's headphone jack is ¼"), so these runs measure underruns and timing, not sound.
+
+All runs: `--rt --cpu 3`, 2 periods, 30 s (`results-pi/live_summary.csv`, labels `first_live`, `small_live`):
+
+| Config | ALSA buffer | Underruns | Model time p50 / p99 / max | CPU | PSS |
+|---|---|---|---|---|---|
+| bypass, 128 × 2 | 5.33 ms | 0 / 11,250 periods | 0.8 / 1.4 / 2.2 µs | 2% | 4.4 MB |
+| Lite, 128 × 2 | 5.33 ms | 0 / 11,250 | 893 / 988 / 1,134 µs | 36% | 5.5 MB |
+| Full pipelined, 128 × 2 | 5.33 ms + 128-sample pipeline | 0 / 11,250 | 1,875 / 2,062 / 2,314 µs | 174% | 13.5 MB* |
+| bypass, 32 × 2 | 1.33 ms | 0 / 45,000 | — | 8% | |
+| **bypass, 16 × 2** | 0.67 ms | **45,082 / 90,000** | — | | |
+| Lite, 64 × 2 | 2.67 ms | 0 / 22,500 | 448 / 509 / 681 µs | 38% | |
+| **Lite, 32 × 2** | **1.33 ms** | **0 / 45,000** | 236 / 303 / 435 µs (deadline 667) | 44% | |
+| **Full pipelined, 64 × 2** | 2.67 ms + 64-sample pipeline | **0 / 22,500** | 969 / 1,085 / 1,340 µs (deadline 1,333) | 178% | |
+
+\*PSS is inflated by `mlockall` locking the pipeline worker's default 8 MB stack (see live-testing-todo).
+
+**Findings.**
+- **Live works at the offline limits.** Lite runs at 32 × 2 (1.33 ms ALSA buffer) and Full pipelined at
+  64 × 2 with no underruns in 30 s each. Live model time is ~6% above `bench` (Full 1,875 vs 1,767 µs at
+  128), likely sample-format conversion and USB interrupt work on the audio core.
+- **The USB path stops between 16 and 32 frames** with 2 periods: bypass at 16 × 2 underruns on every
+  other period with no model at all. That's the interface/driver floor at 2 periods (16 × 3 untested).
+- Period arrival jitter (p99) is ~25% of the period at every size (170 µs at 32, 340 µs at 64, 675 µs at
+  128); interpretation: wake-ups follow USB transfer completion, not exact period boundaries. Not yet investigated.
+- Digital delay of the best configs: Lite 2 × 32 = 64 samples (1.33 ms); Full 2 × 64 + 64 = 192 samples
+  (4.0 ms). The round trip adds the Solo's converters and USB, measured next with the loopback test
+  (needs an RCA → ¼" cable: the Solo's line outputs are RCA).
