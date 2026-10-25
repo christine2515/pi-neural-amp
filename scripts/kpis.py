@@ -217,7 +217,9 @@ def sustained(tag="sustained"):
             "missed": sum(1 for e, d in minutes[m] if e > d),
             "temp_c_max": max(temp) if temp else None,
             "freq_mhz_min": min(freq) / 1000 if freq else None,
-            "throttled_any": int(any(t["throttled_now"] == "1" or t["freq_capped_now"] == "1" for t in win)) if win else None,
+            # new logger: sysfs under-voltage alarm; old logger: vcgencmd bits
+            "throttled_any": int(any(t.get("under_voltage_alarm") == "1" or t.get("throttled_now") == "1"
+                                     or t.get("freq_capped_now") == "1" for t in win)) if win else None,
         })
     return out
 

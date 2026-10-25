@@ -442,3 +442,32 @@ Lite kernel, so the speedup mixes both changes.)
 pipeline adds one block, so 16 + 16 = 32 samples of total delay, the same as unpipelined 32. **For
 Lite, the pipeline buys headroom, not lower latency.** Single-core NEON Lite at 32 samples is the
 simpler configuration with the same latency.
+
+### Iteration 12: 30 minutes sustained, and the thermal logger as a disturber (`sustained_full_pipe`, `ctl_nologger`)
+
+**Run 1** (`sustained_full_pipe`): Full, `npipe` build, `--pipeline 8 --rt --cpu 3`, block 128, paced,
+1,800 s, with `thermal_logger.sh` at 1 Hz (which called `vcgencmd measure_clock` and `vcgencmd
+get_throttled` every second). Chart: `results-pi/charts/thermal_full_pipe.png`.
+
+- **Thermal:** 38.5 °C idle → **44.9 °C** peak, plateau after ~4 minutes; CPU at 900 MHz the whole time;
+  throttle / capping / under-voltage flags never set. The Pi 2 handles two busy cores without a heatsink.
+- **Performance stable:** per-minute p50 1,792 → 1,800 µs (+0.5% over 30 min), p99 2,047–2,065 µs.
+- **But 66 compute overruns in 675,000 blocks** (2.2 per minute), 8 of them > 4 ms, max 7,279 µs. Each
+  long stall also left the schedule behind, so 3,027 blocks (0.45%) started late while catching up. A
+  real ALSA stream would see each stall as one underrun and restart, so 66 is the better estimate of
+  audible glitches.
+
+**Control** (`ctl_nologger`): identical, 600 s, **no logger**:
+
+| 10 minutes, same config | compute overruns | stalls > 4 ms | max | late incl. catch-up |
+|---|---|---|---|---|
+| with logger (run 1, first 600 s) | 26 | 6 | 6,954 µs | 1,035 |
+| **no logger** | **0 / 225,000** | **0** | **2,644 µs** | **1** |
+
+**Verdict: the thermal logger caused the stalls.** `vcgencmd` talks to the VideoCore firmware through
+a mailbox. Calling it every second stalled the audio cores (2 and 3) for up to ~5 ms. This is the second
+time monitoring has disturbed the measurement (the memory sampler in Control 2), so the rule is now:
+**nothing that forks or talks to firmware may run periodically during a timed run.**
+**Fix:** `thermal_logger.sh` now reads only sysfs (temperature, CPU frequency, the hwmon under-voltage
+alarm) and calls `vcgencmd get_throttled` once at start and once at exit. Its "has occurred" bits are
+sticky, so the exit reading still covers the whole run. Run 2 (below) repeats the 30 minutes with it.
