@@ -629,3 +629,29 @@ All runs: `--rt --cpu 3`, 2 periods, 30 s (`results-pi/live_summary.csv`, labels
 - Digital delay of the best configs: Lite 2 × 32 = 64 samples (1.33 ms); Full 2 × 64 + 64 = 192 samples
   (4.0 ms). The round trip adds the Solo's converters and USB, measured next with the loopback test
   (needs an RCA → ¼" cable: the Solo's line outputs are RCA).
+
+### Live: background hum diagnosis (`scripts/hum_check.py`, `results-pi/hum_check.csv`)
+
+The silent parts of the live recordings had an audible buzz: 60 Hz mains hum and its harmonics,
+including a cluster at 2.4–2.9 kHz that the amp model boosts (~+14 dB at that level). 10 s silent
+recordings of the guitar input (capture channel 1), one change at a time. Earlier countdown-based
+attempts were discarded: the changes hadn't been made before recording, so all showed identical levels.
+
+| Step | Setup | Hum, 60 Hz series | Buzz 2.4–2.9 kHz | Total |
+|---|---|---|---|---|
+| B | guitar unplugged, normal gain | −107.7 dBFS | −109.6 | −89.7 |
+| E | unplugged, gain at minimum | −118.6 | −120.4 | −101.1 |
+| A | plugged in, guitar volume 0 | **−126.2** | −122.1 | −105.1 |
+| C | volume partly up, hand on strings | −69.5 | −92.4 | −66.8 |
+| C2 | same, not touching | −68.7 | −90.2 | −66.2 |
+| D | same, guitar moved/turned away from electronics | −75.8 | −94.7 | −69.9 |
+| (ref) | earlier recording's quiet passage, another position | ~−89 | ~−94 | −72 |
+
+**Verdict.** The hum comes from the guitar's **single-coil pickups** (Squier Strat) picking up 60 Hz
+magnetic fields. It is position-dependent: 7 dB from moving the guitar, ~20 dB between positions
+overall. The Solo, cable, Pi, USB and power are clean: −126 dBFS with the guitar volume at 0, and the
+unplugged floor scales with the gain knob, so nothing is injected after the preamp. Touching the
+strings made no difference. Fixes, in order: face away from power bricks and screens; Strat
+selector positions 2/4 (hum-cancelling if the middle pickup is reverse-wound, reverse-polarity,
+unverified for this guitar); a noise gate before the model (no added latency); noiseless pickups or
+shielding.
