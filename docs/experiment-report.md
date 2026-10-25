@@ -139,11 +139,15 @@ Hottest instructions in the vectorized Lite code (`perf annotate`): `vld3.32` de
 **Verdict: refuted. Don't adopt.** The compiler did vectorize (fewer than half the instructions),
 but on the Cortex-A7 the vector code is slower:
 - the A7's NEON datapath is 64 bits wide, so each 128-bit (q-register) operation issues as two halves
-  (ARM's documented microarchitecture; consistent with the IPC drop, not measured directly here);
+  (widely reported for ARM's in-order A-series NEON units, but I found no ARM document stating it for the
+  A7; consistent with the IPC drop, not measured directly here);
 - Lite stores 3 channels interleaved per frame, so vectorizing across frames needs `vld3`/`vst3`
   de-interleaving, which is multi-cycle on this core;
 - 9 weights + accumulators + inputs exceed ARMv7's 16 q-registers, so the loop spills to the stack
   (the `vorr` copies and `sp`-relative loads).
+- found later (round-2 research): LLVM marks `cortex-a7` as slow at VMLA and schedules it with the
+  Cortex-A8 model, so clang emitted separate `vmul` + `vadd` instead of multiply-accumulate. This likely
+  contributed too ([LLVM ARMProcessors.td](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/ARM/ARMProcessors.td)).
 The roadmap's 1.3–2× estimate assumed vector instructions would be roughly as cheap as scalar ones;
 on this core they aren't. A hand-written kernel would have to change the data layout (channel-major,
 so no de-interleaving) and keep the working set inside 16 q-registers to win. That's the roadmap's
@@ -209,5 +213,8 @@ No periodic spikes from the rewinds (`spikes.py`: 0–1 events per run).
 **Accuracy.** Rendered 10 s with both builds on the Pi; `null_test.py`: **bit-identical** for Lite and
 Full (max difference 0). Ring mode only changes where history lives, not the arithmetic.
 
-**Verdict: adopt.** First positive result, and it's free: a compile flag, identical output, faster
-on average and in the tail. Full is being measured next.
+**Full** (`ring0_full`, 3 runs): p50 6,712 µs vs 6,696 (+0.2%), p99 6,940 vs 6,925 µs, max 7,810 vs
+7,845 µs. No measurable change: Full's `memcpy` share was only 2.5%, and its time is in Eigen.
+
+**Verdict: adopt.** First positive result, and it's free: a compile flag, identical output, faster on
+average and in the tail for Lite, neutral for Full. **`ring0` is the reference build from here on.**

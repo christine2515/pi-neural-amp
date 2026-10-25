@@ -1,0 +1,64 @@
+Ring mode 1: refresh only the mirror columns this block wrote instead of all max_buffer_size
+columns. Output bit-identical. No effect with NAM_A2_RING_MODE=0. Round 2, R2-6.
+--- a/NAM/wavenet/a2_fast.cpp	2026-10-24 19:51:24
++++ b/NAM/wavenet/a2_fast.cpp	2026-10-24 19:51:24
+@@ -151,6 +151,7 @@
+   void PrewarmFromCache();
+   void CacheStateAsPrewarmed();
+   void _ring_write(Layer& L, int num_frames);
++  static void _mirror_dirty(float* hist, int pow2_size, int mbs, int wp, int first, int num_frames);
+   void _head_ring_write(int num_frames);
+   void _layer_forward(int layer_idx, const float* cond, int num_frames);
+   void _head_forward(float* output, int num_frames);
+@@ -411,7 +412,31 @@
+ //   end of history, memmove the trailing max_lookback cols back to offset 0
+ //   and reset write_pos. That memmove is the jitter spike we're measuring.
+ // -----------------------------------------------------------------------------
++// Mode 1 invariant: columns [pow2, pow2 + mbs) are a copy of columns [0, mbs).
++// Instead of re-copying all mbs columns every block, copy only the columns this
++// block wrote that fall inside [0, mbs): the part of [wp, wp + first) below mbs,
++// plus the wrapped part [0, num_frames - first). Same bytes in the buffer after
++// every block, so the output is unchanged. A layer's write lands in [0, mbs)
++// once per pow2_size / num_frames blocks, so at block 128 the A2 stack copies
++// about 36% of the old volume on average (short-lookback layers, pow2 = 256,
++// still mirror every other block).
+ template <int Channels>
++void A2FastModel<Channels>::_mirror_dirty(float* hist, int pow2_size, int mbs, int wp, int first, int num_frames)
++{
++  if (wp < mbs)
++  {
++    const int end = std::min(wp + first, mbs);
++    std::memcpy(hist + static_cast<size_t>(pow2_size + wp) * Channels, hist + static_cast<size_t>(wp) * Channels,
++                static_cast<size_t>(end - wp) * Channels * sizeof(float));
++  }
++  if (first < num_frames)
++  {
++    std::memcpy(hist + static_cast<size_t>(pow2_size) * Channels, hist,
++                static_cast<size_t>(num_frames - first) * Channels * sizeof(float));
++  }
++}
++
++template <int Channels>
+ void A2FastModel<Channels>::_ring_write(Layer& L, int num_frames)
+ {
+   #if NAM_A2_RING_MODE == 1
+@@ -426,8 +451,7 @@
+     std::memcpy(hist, src + static_cast<size_t>(first) * Channels,
+                 static_cast<size_t>(num_frames - first) * Channels * sizeof(float));
+   }
+-  std::memcpy(
+-    hist + static_cast<size_t>(L.pow2_size) * Channels, hist, static_cast<size_t>(mbs) * Channels * sizeof(float));
++  _mirror_dirty(hist, L.pow2_size, mbs, wp, first, num_frames);
+   L.write_pos = (wp + num_frames) & L.pow2_mask;
+   #else
+   if (L.write_pos + num_frames > L.history_cols)
+@@ -458,8 +482,7 @@
+     std::memcpy(hist, src + static_cast<size_t>(first) * Channels,
+                 static_cast<size_t>(num_frames - first) * Channels * sizeof(float));
+   }
+-  std::memcpy(
+-    hist + static_cast<size_t>(_head_pow2_size) * Channels, hist, static_cast<size_t>(mbs) * Channels * sizeof(float));
++  _mirror_dirty(hist, _head_pow2_size, mbs, wp, first, num_frames);
+   _head_write_pos = (wp + num_frames) & _head_pow2_mask;
+   #else
+   const int keep = kHeadKernelSize - 1;

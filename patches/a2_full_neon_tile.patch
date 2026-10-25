@@ -1,0 +1,198 @@
+A2-Full: register-blocked NEON layer kernel (8 outputs x 4 frames, all taps + tail fused),
+replacing the per-tap Eigen GEMM. Disable at build time with -DNAM_A2_FULL_EIGEN. Round 2, R2-1.
+--- a/NAM/wavenet/a2_fast.cpp	2026-10-24 19:51:55
++++ b/NAM/wavenet/a2_fast.cpp	2026-10-24 19:51:56
+@@ -25,6 +25,21 @@
+ 
+   #include <Eigen/Dense>
+ 
++  #if defined(__ARM_NEON) && !defined(NAM_A2_FULL_EIGEN)
++    #include <arm_neon.h>
++    #define NAM_A2_FULL_NEON 1
++    // clang marks cortex-a7 "slow VMLx" and splits every vmlaq_* intrinsic into
++    // vmul + vadd (2 instructions per MAC). The kernels below are written for
++    // VMLA, so re-enable it for them only. GCC emits VMLA for the intrinsics.
++    #if defined(__clang__) && defined(__arm__)
++      #define NAM_A2_NEON_KERNEL __attribute__((noinline, target("no-slowfpvmlx")))
++    #else
++      #define NAM_A2_NEON_KERNEL __attribute__((noinline))
++    #endif
++  #else
++    #define NAM_A2_FULL_NEON 0
++  #endif
++
+   #include "../dsp.h"
+ 
+ namespace nam
+@@ -37,7 +52,133 @@
+ namespace
+ {
+ 
++  #if NAM_A2_FULL_NEON
+ // =============================================================================
++// Register-blocked NEON kernel for A2-Full (8 channels).
++//
++// One tile = 8 output channels x T frames. Accumulators: 2 q-registers per frame
++// (outputs 0-3 and 4-7), so T=4 uses 8 q-registers. Inputs are consumed two
++// channels at a time: per input pair j, j+1 we load W columns j and j+1 (4
++// q-registers) and, for each of the T frames, the two input values as one
++// d-register (T d-registers). 8 + 4 + 2 = 14 of the 16 q-registers, so nothing
++// spills. Each pair costs 4 W loads + T input loads for 4T q-MACs (T=4: 8 loads,
++// 16 VMLA; clang 16 armv7: 104 instructions per tap per tile, no spills).
++//
++// The multiply-accumulate is vmlaq_lane_f32 = VMLA.F32 Qd, Qn, Dm[x] on ARMv7,
++// which is not fused (the product is rounded before the add), like Eigen's
++// ARMv7 gebp kernel and like the scalar reference. Only the summation order
++// differs from Eigen (one running sum over all taps instead of a fresh sum per
++// tap added into z), so expect a rounding-level residual, not zero.
++// =============================================================================
++
++// Zero-cost scheduling fence: tells the compiler the accumulators are live in
++// registers here. clang models the A7 with the Cortex-A8 scheduling model (VMLA
++// accumulator forwarding), so without this it regroups the MACs per accumulator,
++// which keeps all 64 weights live and spills them to the stack.
++template <int T>
++__attribute__((always_inline)) inline void a2_neon_fence(float32x4_t (&lo)[T], float32x4_t (&hi)[T])
++{
++  if constexpr (T == 4)
++    asm volatile("" : "+w"(lo[0]), "+w"(lo[1]), "+w"(lo[2]), "+w"(lo[3]), "+w"(hi[0]), "+w"(hi[1]), "+w"(hi[2]),
++                 "+w"(hi[3]));
++  else
++    for (int t = 0; t < T; t++)
++      asm volatile("" : "+w"(lo[t]), "+w"(hi[t]));
++}
++
++// acc[t] (+)= W (8x8, column-major) * x[:, t] for t in [0, T); x columns have stride 8.
++template <int T>
++__attribute__((always_inline)) inline void a2_full_mac8(float32x4_t (&lo)[T], float32x4_t (&hi)[T], const float* __restrict w,
++                         const float* __restrict x)
++{
++  #if defined(__clang__)
++    #pragma clang loop unroll(full)
++  #endif
++  for (int jp = 0; jp < 4; jp++)
++  {
++    const float* wj = w + jp * 16;
++    const float32x4_t w0l = vld1q_f32(wj + 0);
++    const float32x4_t w0h = vld1q_f32(wj + 4);
++    const float32x4_t w1l = vld1q_f32(wj + 8);
++    const float32x4_t w1h = vld1q_f32(wj + 12);
++    float32x2_t xv[T];
++    for (int t = 0; t < T; t++)
++      xv[t] = vld1_f32(x + t * 8 + jp * 2);
++    // Input j for every frame, then input j+1: dependent MACs on one
++    // accumulator are 2T instructions apart (in-order issue, no stall).
++    for (int t = 0; t < T; t++)
++    {
++      lo[t] = vmlaq_lane_f32(lo[t], w0l, xv[t], 0);
++      hi[t] = vmlaq_lane_f32(hi[t], w0h, xv[t], 0);
++    }
++    for (int t = 0; t < T; t++)
++    {
++      lo[t] = vmlaq_lane_f32(lo[t], w1l, xv[t], 1);
++      hi[t] = vmlaq_lane_f32(hi[t], w1h, xv[t], 1);
++    }
++    a2_neon_fence<T>(lo, hi);
++  }
++}
++
++// One layer, T frames starting at frame f0 (taps[k] already points at frame f0's
++// history column for tap k, k = 0 oldest).
++template <int K, int T>
++NAM_A2_NEON_KERNEL void a2_full_tile(const float* const* __restrict taps, const float* __restrict conv_w,
++                         const float* __restrict conv_b, const float* __restrict mixin_w,
++                         const float* __restrict l1x1_w, const float* __restrict l1x1_b,
++                         const float* __restrict cond, float* __restrict hsum, float* __restrict lin,
++                         float leaky_slope)
++{
++  float32x4_t lo[T], hi[T];
++  for (int t = 0; t < T; t++)
++  {
++    lo[t] = vdupq_n_f32(0.0f);
++    hi[t] = vdupq_n_f32(0.0f);
++  }
++  #if defined(__clang__)
++    #pragma clang loop unroll(disable)
++  #endif
++  for (int k = 0; k < K; k++)
++    a2_full_mac8<T>(lo, hi, conv_w + k * 64, taps[k]);
++
++  // Same order as the Eigen path: + bias, + mixin * cond, LeakyReLU, head_sum.
++  const float32x4_t bl = vld1q_f32(conv_b), bh = vld1q_f32(conv_b + 4);
++  const float32x4_t ml = vld1q_f32(mixin_w), mh = vld1q_f32(mixin_w + 4);
++  alignas(16) float zs[T * 8];
++  for (int t = 0; t < T; t++)
++  {
++    float32x4_t a = vaddq_f32(lo[t], bl);
++    float32x4_t b = vaddq_f32(hi[t], bh);
++    a = vmlaq_n_f32(a, ml, cond[t]);
++    b = vmlaq_n_f32(b, mh, cond[t]);
++    // LeakyReLU with slope < 1: max(x, slope * x) == (x < 0 ? slope * x : x).
++    a = vmaxq_f32(a, vmulq_n_f32(a, leaky_slope));
++    b = vmaxq_f32(b, vmulq_n_f32(b, leaky_slope));
++    float* h = hsum + t * 8;
++    vst1q_f32(h, vaddq_f32(vld1q_f32(h), a));
++    vst1q_f32(h + 4, vaddq_f32(vld1q_f32(h + 4), b));
++    vst1q_f32(zs + t * 8, a);
++    vst1q_f32(zs + t * 8 + 4, b);
++  }
++
++  // layer1x1: r = L * z from zero, then lin = (lin + r) + bias (Eigen's order).
++  for (int t = 0; t < T; t++)
++  {
++    lo[t] = vdupq_n_f32(0.0f);
++    hi[t] = vdupq_n_f32(0.0f);
++  }
++  a2_full_mac8<T>(lo, hi, l1x1_w, zs);
++  const float32x4_t ll = vld1q_f32(l1x1_b), lh = vld1q_f32(l1x1_b + 4);
++  for (int t = 0; t < T; t++)
++  {
++    float* p = lin + t * 8;
++    vst1q_f32(p, vaddq_f32(vaddq_f32(vld1q_f32(p), lo[t]), ll));
++    vst1q_f32(p + 4, vaddq_f32(vaddq_f32(vld1q_f32(p + 4), hi[t]), lh));
++  }
++}
++  #endif // NAM_A2_FULL_NEON
++
++// =============================================================================
+ // A2FastModel<Channels>
+ //
+ // Skeleton implementation: correct but not yet optimized.
+@@ -629,6 +770,37 @@
+       lin[2] += lb2 + lw02 * a0 + lw12 * a1 + lw22 * a2;
+     }
+   }
++  #if NAM_A2_FULL_NEON
++  else if constexpr (Channels == 8)
++  {
++    // Register-blocked NEON kernel (see a2_full_tile): all K taps, bias, mixin,
++    // LeakyReLU, head_sum and the 1x1 residual per 4-frame tile, with the conv
++    // accumulators held in registers. Replaces K + 1 Eigen GEMM calls per layer.
++    const float* tap0[K];
++    for (int k = 0; k < K; k++)
++      tap0[k] = &L.history[static_cast<size_t>(tap_base_phys(K - 1 - k)) * 8];
++    const float* cw = L.conv_w.data();
++    float* hs = _head_sum.data();
++    float* li = _layer_in.data();
++    int f = 0;
++    for (; f + 4 <= num_frames; f += 4)
++    {
++      const float* taps[K];
++      for (int k = 0; k < K; k++)
++        taps[k] = tap0[k] + f * 8;
++      a2_full_tile<K, 4>(taps, cw, L.conv_b.data(), L.mixin_w.data(), L.l1x1_w.data(), L.l1x1_b.data(), cond + f,
++                         hs + f * 8, li + f * 8, kLeakySlope);
++    }
++    for (; f < num_frames; f++)
++    {
++      const float* taps[K];
++      for (int k = 0; k < K; k++)
++        taps[k] = tap0[k] + f * 8;
++      a2_full_tile<K, 1>(taps, cw, L.conv_b.data(), L.mixin_w.data(), L.l1x1_w.data(), L.l1x1_b.data(), cond + f,
++                         hs + f * 8, li + f * 8, kLeakySlope);
++    }
++  }
++  #endif
+   else
+   {
+     // Use Eigen's tuned 8x8 × 8xN GEMM for the whole block at once. Unlike a

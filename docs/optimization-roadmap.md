@@ -663,3 +663,429 @@ core 0.
 [dietpi-kernel]: https://dietpi.com/forum/t/linux-headers/403
 [rpi-v7-pkg]: https://aptpeek.dev/raspberrypi/bookworm/main/armhf/linux-image-rpi-v7/1:6.12.93-1+rpt1
 [reddit]: https://www.reddit.com/r/NAM_NeuralAmpModeler/comments/1t7w4ho/19ms_roundtrip_latency_using_a_raspberry_pi_5/
+
+---
+
+## Round 2 (after Pi measurements, 2026-10-24)
+
+Everything under "Measured (Pi)" comes from `docs/experiment-report.md` (baseline, iterations 1–4).
+"Checked (Mac)" means I built or ran something on the Mac for this section: clang armv7 cross builds
+with `llvm-objdump`, or native arm64 renders compared with `null_test.py`. None of that is a Pi
+timing. "Estimate" means a guess, with the reasoning next to it.
+
+Reference points (Measured, Pi, block 128, clang 16, `performance` governor):
+
+| | p50 | p99 | load | cycles / sample | instr / sample | IPC |
+|---|---|---|---|---|---|---|
+| Lite, ring mode 1 (`baseline`) | 1,032 µs | 1,092 µs | 38.9% | 7,670 | 6,815 | 0.89 |
+| Lite, ring mode 0 (`ring0`, adopted) | 991 µs | 1,067 µs | — | — | — | — |
+| Full, ring mode 1 (`baseline`) | 6,696 µs | 6,925 µs | 251% | 46,800 | 21,980 | 0.47 |
+
+Cycles and instructions per sample are the `perf_base` counts divided by the 972,800 processed
+samples (iteration 1). They include model load and warm-up, so they slightly overstate per-sample cost.
+Full has to get **≥2.6x** faster for its p99 to fit the 2,667 µs deadline.
+
+### R2.1 Why the round-1 vectorization ideas lost on the A7
+
+Two "obvious" changes made more vector code and ran slower (iteration 2: Lite +10%, IPC 0.89 → 0.36;
+iteration 3: Full +6%, IPC 0.47 → 0.36). These are the reasons I can support, with how sure I am
+of each:
+
+1. **NEON can't dual-issue, and the core is in order.** *High confidence.* GCC's Cortex-A7
+   scheduling model says the A7 "is in order and can dual-issue under limited circumstances", and
+   "neon instructions cannot dual-issue" ([GCC cortex-a7.md][gcc-a7md]). ARM's launch material
+   describes an in-order 8-stage pipeline ([New Electronics][ne-a7]). What follows: every `vorr`
+   copy, stack spill, address add and de-interleaving load in NEON code takes its own issue slot,
+   and nothing out of order hides a load-use stall. Both refuted variants added exactly those
+   instructions (Measured: `vorr`, `sp`-relative `vldmia`, `vld3` and `vld1 {d[]}` were the hot
+   instructions in `perf annotate`).
+2. **The NEON datapath is 64 bits wide, so a q-register op costs about two d-register ops.**
+   *Medium confidence.* It's widely reported and it fits iteration 2: instructions fell 55% while
+   cycles rose 11%, so the cycles per instruction went up 2.5x. I couldn't find it in an ARM
+   document this session. I found no instruction timings in the ARM material I could reach (the
+   NEON MPE TRM is [ARM DDI 0462][a7-neon-trm]), and the author of [hardwarebug][a7-timings] says the
+   public TRM omits them. GCC's model
+   doesn't separate d and q forms: it books all non-multiply NEON ops as 2 cycles on both issue slots
+   (`cortex_a7_both*2`) and NEON MLA as 1 cycle with 8-cycle latency and a 4-cycle accumulator
+   bypass. The experiment report calls the 64-bit datapath "ARM's documented microarchitecture";
+   I'd soften that to "widely reported" until there's a citation. A microbenchmark settles it
+   (round 1, section 5, step 4: `vmla.f32 d` vs `q`, 8 independent accumulators).
+3. **clang schedules the A7 as if it were an A8 and refuses to emit VMLA.** *High confidence
+   (read from source, then Checked on the Mac).* In LLVM's `ARMProcessors.td`, `cortex-a7` uses
+   `CortexA8Model` with `FeatureHasSlowFPVMLx`, `FeatureHasSlowFPVFMx`, `FeatureHasVMLxHazards` and
+   `FeatureVMLxForwarding` ([LLVM ARMProcessors.td][llvm-armproc]). Checked (Mac, Apple clang 16 and
+   Homebrew clang 23, `-mcpu=cortex-a7`): `vmlaq_lane_f32` compiles to `vmul.f32` + `vadd.f32`, two
+   instructions per MAC. My first draft of the Full kernel also came out with every MAC regrouped per
+   accumulator (the A8 model's VMLA forwarding makes chains on one accumulator look cheap), which kept
+   all 64 weights live and spilled them: 253 instructions per tap loop, including 19 stack stores.
+   With VMLA re-enabled for the kernel (`__attribute__((target("no-slowfpvmlx")))`) and a zero-cost
+   `asm volatile("" : "+w"(acc)...)` fence after each input pair, the loop is 104 instructions with no
+   spills. Iteration 2's `vorr` copies and stack loads look like the same mechanism hitting the
+   auto-vectorized loop. That's an inference: I didn't re-derive that build's schedule.
+4. **16 q-registers.** *High confidence (architecture).* Auto-vectorizing Lite across 4 frames needs
+   9 broadcast weights (9 q) + 3 accumulators + 3 de-interleaved inputs + temporaries, more than 16,
+   hence the spills. The fix is to choose a layout where weights are shared across frames by
+   construction, not to vectorize harder.
+5. **`vld3` is expensive.** *Medium-low confidence on cost; high that it was hot.* `vld3.32` was a
+   hot instruction (Measured). GCC's model gives 3-register loads one more cycle of latency than
+   1–2-register loads, but that's a compiler model, and `perf annotate` skid smears attribution
+   onto neighbouring instructions. Either way, the round-2 Lite kernel doesn't use it.
+6. **Weight reload.** *High confidence (Measured).* `lazyProduct` removed packing (−20%
+   instructions) but raised L1D loads 18% and dropped IPC to 0.36. The hot instructions were
+   `vld1.32 {dN[]}` broadcasts: each weight is re-broadcast for every output column. Eigen's GEMM
+   pays packing to keep a register tile, and on this core that was the right trade. A kernel has to
+   keep weights in registers across several frames *and* never spill.
+
+The design rule that follows, and that both round-2 kernels obey: **≤14 live q-registers, weights
+loaded once per tap and shared by 4 frames, inputs used as `d`-register lanes (`VMLA.F32 Qd, Qn,
+Dm[x]`), no de-interleaving loads, VMLA rather than VMUL+VADD, and an explicit fence so clang's A8
+model can't regroup the MACs.** VMLA is the non-fused multiply-accumulate (two roundings, the same
+as the scalar `a += w * x` code); VFMA is the fused one ([LLVM commit][llvm-vmla]; ARMv7-A ARM
+[DDI 0406][armv7arm]). So VMLA can match the reference bit for bit, and VFMA can't.
+
+### R2.2 Ranked candidates
+
+Ranked by expected payoff against the measured bottlenecks: Full's 2.6x gap first, then Lite headroom,
+then the tail. All effect numbers are **estimates** unless marked. "Who" says whether Claude can run
+the test alone (cross build on the Mac, `remote_sweep.sh`/`perfstat.sh`/renders over SSH, no sudo,
+no reboot) or whether it needs Christine (sudo, reboot, kernel, hardware). This assumes the Pi still
+has the `performance` governor. After a reboot, setting it again (`set_governor.sh`) needs sudo.
+
+| # | Candidate | Model | Expected effect (estimate) | Effort | Risk | Who | Patch |
+|---|---|---|---|---|---|---|---|
+| R2-1 | Register-blocked NEON layer kernel (8 out × 4 frames, all taps + tail fused) | Full | **2–4x** (central ~3x) | done; Pi test 1 h | medium | Claude | `a2_full_neon_tile.patch` |
+| R2-2 | NEON kernel with output channels in lanes, 4 frames/tile, taps fused, no `vld3` | Lite | **1.2–2.5x** | done; Pi test 1 h | low–medium | Claude | `a2_lite_neon_lanes.patch` |
+| R2-3 | Two-core layer pipeline (after R2-1) | Full | 1.8–1.9x throughput, +1 block latency | 2–4 days | medium-high | Claude (code + run) | — (needs `src/`) |
+| R2-4 | Compiler: VMLA re-enabled globally, clang 23, GCC 14 native, `-mtune` | both | 0–15% on scalar code; ≈0–5% after R2-1/2 | 1–3 h | low | Claude | — (flags) |
+| R2-5 | Block-size re-sweep after R2-1/2 (per-block overhead vs cache) | both | picks the smallest safe block; 64 likely for Lite | 1 h | low | Claude | — |
+| R2-6 | Ring mode 1 with dirty-only mirror refresh | both | vs mode 1: −3 to −5% Lite p50; vs `ring0`: 0 ± 2% | done; Pi test 30 min | low | Claude | `a2_ring_mirror_dirty.patch` |
+| R2-7 | Head conv: vectorize + drop per-tap masking | both | Lite −3 to −8% after R2-2; Full ≈1% | 0.5 day | low | Claude | — |
+| R2-8 | Software prefetch (`pld`) for long-dilation taps | Full | 0–3% now; 0–10% after R2-1 | 0.5 day | low | Claude | — |
+| R2-9 | Int16 fixed-point NEON (`vmlal.s16`/`vqdmulh`) | Full | up to 1.5–2x over R2-1 if s16 MACs issue 2x faster (unverified) | 1–2 weeks | high (accuracy) | Claude | — |
+| R2-10 | FTZ (FPSCR.FZ) in the audio thread | both | ≈0 normally; removes denormal stalls in scalar remainder/head | 1 h | low | Claude (code in `src/`) | — |
+| R2-11 | Per-file `-O2` vs `-O3` (code size / I-cache) | both | ≈0 (Measured: I-cache misses negligible) | 30 min | low | Claude | — |
+| R2-12 | `isolcpus=3` + `--rt` + IRQ-affinity check + USB FIQ settings | both | tail only (p99.9/max, wake-up) | 1–2 h + reboots | low–medium | **Christine** | — |
+| R2-13 | PREEMPT_RT kernel (`rpi-7.1.y`+) | both | tail only; matters at ≤32–64 frames | 1–3 days | high | **Christine** | — |
+| R2-14 | `live --mmap`, then I2S ADC/DAC instead of USB | both | <1% compute; I2S removes the USB latency floor | 1–2 h / hardware | low / medium | **Christine** (hardware) | — |
+
+#### R2-1. Full: register-blocked NEON layer kernel — `patches/a2_full_neon_tile.patch`
+
+**Hypothesis.** Full is overhead-bound in Eigen (Measured: 22% packing, `gebp` at IPC 0.47, 179 GEMM
+calls per block), and a coefficient-based product is load-bound (Measured, iteration 3). A kernel
+that holds an 8-output × 4-frame accumulator tile in 8 q-registers across all K taps, loads each
+weight column once per tile, and fuses bias, mixin, LeakyReLU, head sum and the 1×1 residual removes
+the packing, the per-tap stores and reloads of `z`, the broadcast loads, and all K + 1 Eigen calls (with their
+setup) per layer.
+
+**Change (the patch).** New `a2_full_tile<K, T>` in `a2_fast.cpp`, used for `Channels == 8` when
+`__ARM_NEON` is defined (`-DNAM_A2_FULL_EIGEN` restores the Eigen path). Per input pair (j, j+1):
+4 q-loads of W columns, T d-loads of inputs, 4T `vmlaq_lane_f32`. Registers: 8 accumulators + 4 W
++ 2 (inputs) = 14 q. The tap loop stays rolled (`#pragma clang loop unroll(disable)`) to keep code
+small. The 1×1 reuses the same MAC routine on a 32-float stack scratch holding the activations.
+`noinline` + `target("no-slowfpvmlx")` (clang/ARMv7 only) gets real VMLA. Frames left over from
+`num_frames % 4` use a T=1 tile.
+
+**Checked (Mac):**
+- Builds cleanly, no warnings: `BUILD_DIR=<scratch> ./scripts/cross_build.sh
+  -DBENCH_NAM_PATCHES=patches/a2_full_neon_tile.patch` (Apple clang 16). Also with Homebrew clang 23,
+  stacked with the other two patches, and with `-DBENCH_A2_RING_MODE=0`.
+- armv7 codegen (`llvm-objdump` on the linked `bench`): `a2_full_tile<6,4>` is 388 instructions.
+  The tap loop is **104 instructions per tap per 4-frame tile: 64 `vmla.f32 q`, 32 NEON loads,
+  8 other, no spills** (the only stack traffic is the intended 32-float scratch). That's 0.41
+  instructions per MAC in the loop. Dynamic count per layer: K=6 → 908 instructions per 4 frames
+  (1,792 MACs, 0.51/MAC); K=15 → 1,844 (4,096 MACs, 0.45/MAC). Baseline Full: 1.9 instructions/MAC
+  (Measured). The mixin and 1×1 tail still has 16 `vmul` (clang's VMLx-hazard expansion splits some
+  tail MACs). That's minor.
+- **Null test (Mac arm64, 10 s of `di.wav`, block 128 and 127): Full residual −133.2 dB relative
+  (max abs diff 2.68e-7, −131.4 dBFS); Lite bit-identical.** Below the −100 dB bar. The residual
+  comes from summation order: one running sum over all taps vs Eigen's per-tap partial sums added
+  into `z`. On the Mac both sides use fused `fmla`. On the Pi both use non-fused VMLA, so expect a
+  residual of the same order (estimate). **Check it on the Pi before adopting.**
+
+**Expected effect (estimate).** Instructions per sample: layers ≈ 21 × 232 + 2 × 466 ≈ 5,800 (Checked
+counts above plus ~5 per frame of call overhead, est.), plus ~1,000–2,000 for ring writes, the head
+and I/O (est.). That's ~7,000–8,000 instead of 21,980 (Measured), **≈ −65% (est.)**. Cycles depend
+on what a `vmla.f32 q` costs on this core, which is the open question in R2.1 point 2:
+- at 2 cycles per q-VMLA with loads not dual-issued: ~170–200 cycles per 256-MAC tap step,
+  ≈ 1.3–1.5 MAC/cycle, ≈ 8–9 k cycles/sample of MACs;
+- memory: the 204 L2 accesses and 15 L2 misses per sample (Measured counts) don't shrink with the
+  kernel. At an assumed 10–20 cycles per L2 hit and 100–150 per miss (assumed, not measured),
+  that's 3–6 k cycles/sample if none of it overlaps.
+
+That totals 12–17 k cycles/sample vs 46.8 k, **2.8–3.9x**. If q-VMLA effectively costs 4 cycles,
+it's ~21 k, **2.2x**. So the range is **2–4x, central ~3x**, against the **2.6x** needed. It may or
+may not get Full's p99 under the deadline alone, which is why R2-3 stays on the list.
+
+**Test (Claude can run all of it):**
+
+    BUILD_DIR=build-armhf-r2full ./scripts/cross_build.sh -DBENCH_A2_RING_MODE=0 \
+        -DBENCH_NAM_PATCHES=patches/a2_full_neon_tile.patch
+    VARIANT=r2full TAG=r2_full SLIM=full BLOCKS="64 128 256" MODE=burst ./scripts/remote_sweep.sh
+    RESULTS_DIR=results-pi python3 scripts/kpis.py --compare ring0_full r2_full
+    ssh pi 'cd ~/pi-neural-amp && TAG=perf_r2full BENCH=./build-r2full/bench SLIMS=1 ./scripts/perfstat.sh'
+    rsync -a pi:~/pi-neural-amp/results/perf/ results-pi/perf/
+    # accuracy on the Pi (reference = ring0 build, same ring mode):
+    ssh pi 'cd ~/pi-neural-amp && ./build-r2full/bench --model models/a2_fender_super_reverb.nam --slim 1 \
+        --input audio/di.wav --duration 10 --block 128 --render results/render_r2full_slim1.wav \
+        --summary-out results/summary_render.csv'
+    rsync -a pi:~/pi-neural-amp/results/render_r2full_slim1.wav results-pi/
+    RESULTS_DIR=results-pi python3 scripts/null_test.py results-pi/render_ring0_slim1.wav \
+        results-pi/render_r2full_slim1.wav --label r2_full_pi
+
+(`remote_sweep.sh` doesn't sync renders: it excludes `*.wav`, hence the explicit `rsync`. Check that
+the existing `render_ring0_slim1.wav` used the same `--duration 10 --block 128`, or re-render it. `ring0_full`
+is the existing Full ring-mode-0 tag in `results-pi/`; it isn't in the experiment report yet, so
+summarize it first.) **Confirms:** Full p50 ≤ 2,500 µs at 128 (≥2.7x) and Pi null ≤ −120 dB. Then
+read `perfstat` IPC and L2 misses to see whether the remainder is compute or memory. **Refutes:**
+<1.5x. Then the A7's q-VMLA throughput is the limit. Run the d-vs-q microbenchmark and consider a
+d-register variant (2 outputs per op, half the lanes, no double pumping).
+
+**Risk.** The A7 surprised twice, so this is a test, not a promise. GCC 14 natively is untested
+(no GCC on this Mac); the intrinsics and `"+w"` asm are GCC-compatible as far as I know.
+
+#### R2-2. Lite: NEON kernel with channels in lanes — `patches/a2_lite_neon_lanes.patch`
+
+**Hypothesis.** Lite is scalar, at 3.9 instructions per MAC (Measured). Iteration 2 lost because it
+vectorized *across frames* of an interleaved layout (`vld3`, 9 broadcast weights, spills). Put the
+3 *output channels* in lanes instead (one q-register per frame, lane 3 = zero padding). Then a tap's
+three weight columns are 3 q-registers shared by 4 frames, and the 4 frames' inputs are 12
+contiguous floats (3 plain `vld1q`). Each input value is a d-register lane of those loads, so no
+de-interleaving is needed. The accumulators stay in registers across all K taps, so the `z` buffer
+store/reload per tap disappears.
+
+**Change (the patch).** Padded weight copies (`conv_w4`, `l1x1_w4`, … built once after weight
+load), and `a2_lite_tile4<K>` used for each run of 4 frames. Leftover frames fall through to the
+original scalar loops (now starting at `f_begin`). The arithmetic order per output is the same as
+the scalar code: bias, then taps in order with input channels 0, 1, 2, then mixin, LeakyReLU
+(`max(x, 0.01x)`, exact for slope < 1), head sum, and `lin += ((b + L0·a0) + L1·a1) + L2·a2`.
+`-DNAM_A2_LITE_SCALAR` restores the scalar path.
+
+**Checked (Mac):**
+- Builds cleanly (clang 16 and 23, alone and stacked).
+- armv7 codegen: tap loop **22 instructions per tap per 4 frames: 12 `vmla.f32 q`, 6 `vld1`, 4 other,
+  no spills, no `vld3`**, i.e. 0.61 instructions per MAC. The scalar tap loop it replaces is 31
+  instructions per tap per frame (9 `vmul` + 9 `vadd` + 9 loads/stores …), 3.4 per MAC. Whole tile:
+  K=6 → ~246 instructions per 4 frames (264 MACs incl. mixin and 1×1); K=15 → ~444 (588 MACs).
+  The tail uses `vtrn`/`vext` to pack 4×3 lanes into the stride-3 buffers.
+- **Null test: bit-identical (residual −inf) for Lite and Full**, at block 128 and 127, both with
+  clang's default FP contraction (fused `fmla` on both sides) and with `-ffp-contract=off` (unfused on
+  both sides, closer to ARMv7 VMLA). The test can see rounding changes: the reference built with
+  and without contraction differs by −131.3 dB.
+- On the Pi, expect bit-identical output, except that ARMv7 Advanced SIMD always flushes denormals
+  to zero while scalar VFP doesn't ([GCC ARM options][gcc-arm]: NEON is not fully IEEE 754). That
+  only matters for values ≲1e-38.
+
+**Expected effect (estimate).** Layer instructions ≈ 21 × 66 + 2 × 116 ≈ 1,630 per sample, plus ring
+writes, the head (48 scalar MACs) and I/O. That's ~2,000–2,300 instead of 6,815 (Measured),
+**≈ −67%**. At 2 cycles per q-VMLA, ≈ 34 cycles per tap per 4 frames plus the tail, ≈ 2,000 cycles/sample
+for the layers, ~3,000 total vs 7,670: **~2.5x**. If the result runs at iteration 2's IPC of 0.36,
+it's ~6,100 cycles: **1.25x**. **Range 1.2–2.5x**, so Lite p50 at 128 lands somewhere around
+400–830 µs (est.). The payoff isn't passing at 128 (it already does). It's headroom for 64 or 32
+frames (R2-5) and a lower CPU share.
+
+**Test (Claude):**
+
+    BUILD_DIR=build-armhf-r2lite ./scripts/cross_build.sh -DBENCH_A2_RING_MODE=0 \
+        -DBENCH_NAM_PATCHES=patches/a2_lite_neon_lanes.patch
+    VARIANT=r2lite TAG=r2_lite SLIM=lite BLOCKS="32 64 128" MODE=burst ./scripts/remote_sweep.sh
+    RESULTS_DIR=results-pi python3 scripts/kpis.py --compare ring0 r2_lite
+    ssh pi 'cd ~/pi-neural-amp && TAG=perf_r2lite BENCH=./build-r2lite/bench SLIMS=0.25 ./scripts/perfstat.sh'
+    # null: render --slim 0.25 as in R2-1, compare against results-pi/render_ring0_slim0.25.wav
+
+**Confirms:** Lite p50 at 128 ≤ 800 µs (≥1.25x vs `ring0`'s 991 µs), null = −inf or ≤ −140 dB.
+**Refutes:** ≤5% gain. Then look at `perf annotate`: if the time sits on `vmla.f32 q`, q-ops are the
+bottleneck. Fall back to a d-register variant (2 frames per tile, outputs (0,1) in one d-register and
+output 2 in a second, 6 d-VMLA per tap).
+
+#### R2-3. Full: two-core layer pipeline
+
+**Hypothesis.** One A7 core may not reach 2.6x even with R2-1 (the low end of its range). Splitting
+the 23 layers over two cores halves per-core work at the cost of one block of latency.
+
+**Change.** Split at layer 13. Cost ∝ (K+1) per layer gives 13 × 7 = 91 units for layers 0–12 vs
+7 + 2 × 16 + 7 × 7 = 88 for layers 13–22 (Checked, arithmetic). The handoff per block is `layer_in`,
+`head_sum` and `cond`: 128 × (8 + 8 + 1) floats ≈ 8.5 KiB through the shared L2. It needs a NAM
+API to run a layer range (a patch) and a pinned second SCHED_FIFO/normal thread in `bench`/`live`
+with a lock-free SPSC handoff (code in `src/`, outside this round's scope).
+
+**Expected effect (estimate).** Per-stage time ≈ 52% of the single-core R2-1 time plus <2% handoff,
+so **1.8–1.9x throughput**. With R2-1 at its central 3x (≈2,230 µs at 128, est.), each stage is
+≈1,200 µs, ~45% load. **+1 block latency** (2.67 ms at 128, 1.33 ms at 64). **Who:** Claude can
+write and run it (`--pipeline 2`, no sudo; isolating two cores for it is Christine's step).
+**Do it only if R2-1 lands below ~2.6x.**
+
+#### R2-4. Compiler choices
+
+**Hypothesis.** clang's A7 target is tuned for an A8 (R2.1 point 3). Re-enabling VMLA globally should
+halve the arithmetic instructions in any remaining scalar code without changing results.
+
+- **VMLA everywhere:** `-DCMAKE_CXX_FLAGS="-Xclang -target-feature -Xclang -slowfpvmlx"`. Checked
+  (Mac): the unpatched Lite tap loops become 9 `vmla.f32 s` instead of 9 `vmul` + 9 `vadd`
+  (63 scalar VMLA in Lite's `process`). Estimate: 0–15% on the unpatched Lite (latency chains, not
+  instruction count, may dominate). Expect bit-identical output (VMLA isn't fused); null-test it.
+  ≈0–5% once R2-1/R2-2 are in, since their kernels already use VMLA.
+- **clang 23** (Homebrew): `-DCROSS_CLANG=/opt/homebrew/opt/llvm/bin/clang
+  -DCROSS_CLANGXX=/opt/homebrew/opt/llvm/bin/clang++`. Checked: builds with all patches, same
+  104/22-instruction inner loops. The A7 still uses `CortexA8Model` on LLVM `main`, so expect ≈0.
+- **GCC 14 native on the Pi:** round 1's single-run comparison had GCC 7% faster on Lite p50
+  (Measured, one run). GCC has a real A7 model ([GCC cortex-a7.md][gcc-a7md]). Build natively on the
+  Pi (no sudo, slow) and run `sweep.sh` with `TAG=gcc14_*`. The patches haven't been compiled with
+  GCC: a build failure is possible, but I expect it to compile.
+- **`-mtune`:** clang accepts `-mtune=cortex-a7` silently; on ARM `-mcpu` already picks the model, so
+  expect no change (untested on the Pi). **`-fno-trapping-math`:** round 1 showed narrower FP flags
+  don't unlock vectorization, and the kernels no longer need it. **`__restrict` and
+  `#pragma clang loop unroll`:** already used in the patches. In the Full kernel, a fully unrolled
+  tap loop would blow up code size for K=15, so it's kept rolled on purpose.
+
+**Pitfall.** `CMAKE_CXX_FLAGS` isn't recorded in `build_flags`, so put the flag in the `TAG` (e.g.
+`TAG=r2_vmla`). `BUILD_FLAGS_STR` records the compiler ID and version, so clang 23 shows up.
+
+#### R2-5. Block size, re-measured after R2-1/2
+
+**Hypothesis.** Once the MACs are cheap, fixed per-block costs (24 ring writes, 23 × (1 + N/4) kernel
+calls, head setup) and the history working set (Full's live window: ~246 KiB at 64 vs ~294 KiB at 128,
+round 1 §11) decide the best block. Estimate: µs/sample flat from 128 down to 64, rising below 32.
+
+**Test (Claude):** `BLOCKS="16 32 64 128 256" MODE=paced` for the R2 variants (paced, so wake-up
+latency counts), then compare `p50_us / block` across sizes. **Confirms** a fixed overhead if
+µs/sample at 32 is >20% above 128.
+
+#### R2-6. Ring mode 1 with dirty-only mirror — `patches/a2_ring_mirror_dirty.patch`
+
+**Hypothesis.** Mode 1 re-copies all `max_buffer_size` mirror columns of every layer every block
+(Measured: `memcpy` 5.1% of Lite; `ring0` −4% p50, which removes it). Only columns this block wrote
+inside `[0, mbs)` need refreshing.
+
+**Change.** `_mirror_dirty()` copies `[wp, min(wp+first, mbs))` and the wrapped `[0, n−first)` into
+the mirror. Same buffer contents after every block. **Checked (Mac):** builds cleanly; **bit-identical**
+for Lite and Full at block 128 and 127 (127 exercises partial wraps). Copy volume (Checked,
+arithmetic over the 23 layers + head): at block 128 an average of 1,096 instead of 3,072 columns per
+block, **36%** (Lite 12.8 vs 36 KiB, Full 34 vs 96 KiB). Short-lookback layers (`pow2 = 256`) still
+mirror every other block.
+
+**Expected effect (estimate).** vs mode 1: Lite −3 to −5% p50 (≈ the `ring0` delta). vs `ring0`:
+0 ± 2% mean, possibly a tighter max (no rewind `memmove`; `ring0`'s rewinds didn't show as spikes,
+though, Measured). Its value is a constant-work mode-1 ring that stacks with R2-1/R2-2, and the share
+it saves grows as compute shrinks (~41 µs of a ~500 µs Lite block after R2-2, est.).
+
+**Test (Claude):** build *without* `BENCH_A2_RING_MODE` (mode 1), stacked with R2-2, and compare
+against R2-2 in mode 0:
+
+    BUILD_DIR=build-armhf-r2mirror ./scripts/cross_build.sh \
+        "-DBENCH_NAM_PATCHES=patches/a2_lite_neon_lanes.patch;patches/a2_ring_mirror_dirty.patch"
+    VARIANT=r2mirror TAG=r2_mirror SLIM=lite BLOCKS="64 128" MODE=burst KEEP_BLOCKS=1 ./scripts/remote_sweep.sh
+    RESULTS_DIR=results-pi python3 scripts/kpis.py --compare r2_lite r2_mirror
+
+#### R2-7. Head conv
+
+The head (K=16, C→1) runs frame-outer with a masked column index per (frame, tap) and a scalar
+C-long dot product. That's 48 MACs/sample for Lite (2.8% of MACs) at high overhead per MAC. Change:
+tap-outer over the contiguous mirrored history, 4 frames per q-register (`vmlaq_n_f32` by weight),
+no masks. Estimate: −3 to −8% of Lite after R2-2 (its share grows as the layers shrink), ≈1% Full.
+Not written yet. Null test should be bit-identical if the per-output tap/channel order is kept.
+
+#### R2-8. Prefetch
+
+Measured: L1D miss rate <1.1%, Full 15 L2 misses per sample. Today that's ≲3% of Full's cycles at
+assumed DRAM latencies, but it could be 10%+ of R2-1's cycle budget. Change: `__builtin_prefetch` of
+the next tile's columns for the dilation-101/239 layers (their taps are 400–1,200 columns apart).
+**Test:** `perfstat.sh` L2 misses + `remote_sweep` on top of R2-1. **Confirms** only if R2-1's
+`perfstat` first shows L2 misses as a significant share.
+
+#### R2-9. Int16 fixed point for Full (research)
+
+`vmlal.s16 Qd, Dn, Dm[x]` does 4 MACs from a 64-bit d-register input. If the datapath really is
+64-bit, it might issue at twice the rate of `vmla.f32 q` (unverified; the microbenchmark tells).
+Pipeline: int16 weights/activations, int32 accumulators, `vqrdmulh`/`vqmovn` to rescale per layer,
+LeakyReLU as compare/select. **Accuracy plan before any timing:** (1) per-layer max-abs calibration
+on `di.wav` plus a second, louder DI; (2) a float simulation of the quantization in Python/C++ on
+the Mac, to get the null residual before writing NEON; (3) null test vs float on both DIs, gate at
+**−100 dB, which I expect it to miss (est. −70 to −90 dB for 16-bit activations through 23 residual
+layers)**; (4) a listening check. Expect it to fail the gate. Do it only if R2-1 + R2-3 fall short.
+
+#### R2-10. FTZ
+
+NEON already flushes denormals. What's left is the scalar remainder frames, the head and the
+rechannel. Set FPSCR.FZ once in the audio thread (`vmrs`/`vmsr`, a `--ftz` flag in `src/`).
+Estimate ≈0 on normal playing. Possible removal of rare `max` spikes on near-silence decays. Changes
+output only at denormal levels. Low priority. Bundle it with R2-7.
+
+#### R2-11. Per-file `-O2` vs `-O3`
+
+Measured: L1 I-cache misses are 219 k (Lite) and 2.27 M (Full) per 20 s run, against 7.5 G / 45.5 G
+cycles, under 0.1% even at 20 cycles each (assumed). The round-2 kernels are small (388 and 136
+instructions, Checked). **Estimate ≈0.** `-O3` is hard-coded in `CMakeLists.txt` (`OPT_FLAGS`), so a
+per-file `-O2` arm needs a new CMake option. Skip it unless something else points at code size.
+
+#### R2-12 to R2-14. OS, kernel and I/O (Reddit items, tail and latency, not compute)
+
+All of these need Christine: they need sudo, a reboot, a kernel build, or hardware.
+- **R2-12 `isolcpus=3` + `--rt` + IRQs:** `compare_rt.sh` arms `rt`/`rt_isol` (RUNBOOK §4/4b) on top
+  of the R2 build with the best block size. Read `/proc/interrupts` during a `live` run to see where
+  `dwc_otg` lands (root not needed to read it; `irqaffinity`/`/proc/irq/*/smp_affinity` writes need
+  root). USB FIQ (`dwc_otg.fiq_fsm_enable`, `fiq_enable` on the cmdline) is a reboot experiment.
+  Leave it at the default unless xruns point at USB. Expected: lower `wake_p99_us`/max, no change to
+  p50.
+- **R2-13 PREEMPT_RT:** unchanged from round 1 (item 13): `rpi-7.1.y`+ self-built, decide from
+  `missed_with_wake` in `rt_isol`. It matters only once R2-2 makes 32–64-frame blocks viable.
+- **R2-14 `live --mmap`, then I2S:** `--mmap` is planned (round 1, item 14). Expected <1% of the
+  deadline. Claude can write it; running it needs the interface connected. I2S stays a hardware
+  decision after the USB floor (`live --bypass` + `latency_test.sh`) is measured. Not tied to this
+  round's compute work.
+
+### R2.3 Suggested order
+
+1. **R2-1 on the Pi** (Full, ring mode 0) with its null test and `perfstat`. It's the only item that
+   can close most of Full's gap, and its result decides R2-3 and R2-8.
+2. **R2-2 on the Pi** (Lite), then **R2-5** block sweep with R2-1 + R2-2 stacked
+   (`-DBENCH_A2_RING_MODE=0 "-DBENCH_NAM_PATCHES=patches/a2_full_neon_tile.patch;patches/a2_lite_neon_lanes.patch"`;
+   Checked: builds).
+3. **R2-4 VMLA flag and GCC 14**: cheap, mostly for the record.
+4. **R2-6** mirror vs `ring0`, then **R2-7** head.
+5. **R2-3** only if R2-1 < 2.6x. **R2-9** only if R2-1 + R2-3 fall short.
+6. **R2-12/13** (Christine) once the target block size is known.
+
+### R2.4 What I checked for this section, and what I couldn't
+
+Checked (Mac, 2026-10-24):
+- All three patches apply with `patch -p1` to a copy of `external/NeuralAmpModelerCore/NAM` at
+  `0b3d3c9`, alone and stacked in the order R2-1, R2-2, R2-6. `external/` itself is untouched.
+- Cross builds (`scripts/cross_build.sh`, scratch `BUILD_DIR`s, Apple clang 16): each patch alone,
+  all three stacked, R2-1+R2-2 with `-DBENCH_A2_RING_MODE=0`, and R2-1+R2-2 with Homebrew clang
+  23.1.4: all build with 0 warnings. `build_flags` records the patch names.
+- Codegen numbers above (`llvm-objdump` on the linked armv7 `bench`).
+- Native arm64 renders (10 s of `audio/di.wav`, block 128; also block 127 for R2-1/R2-6), compared
+  with `null_test.py`:
+
+| Patch | Lite (`--slim 0.25`) | Full (`--slim 1`) |
+|---|---|---|
+| `a2_full_neon_tile` | bit-identical | **−133.2 dB** (max 2.68e-7, −131.4 dBFS) |
+| `a2_lite_neon_lanes` | bit-identical (also with `-ffp-contract=off`) | bit-identical |
+| `a2_ring_mirror_dirty` | bit-identical | bit-identical |
+| all three stacked | bit-identical | −133.2 dB |
+
+Not verified:
+- **Any Pi timing of the patches.** Every speedup above is an estimate.
+- Pi (ARMv7) numerics. Mac arm64 NEON uses fused `fmla` and doesn't flush denormals; the Pi uses
+  VMLA with flush-to-zero. Run the null tests on the Pi renders.
+- The A7's q- vs d-register NEON throughput and VMLA latency (no ARM doc found; GCC's model is a
+  proxy).
+- GCC 14 compiling the patches.
+- DRAM/L2 latencies used in the R2-1 estimate (assumed values).
+
+### Round 2 sources
+
+- [gcc-a7md]: GCC Cortex-A7 pipeline description, `gcc/config/arm/cortex-a7.md` (in-order, limited dual-issue, NEON never dual-issues, MLA latency/bypass): https://github.com/gcc-mirror/gcc/blob/master/gcc/config/arm/cortex-a7.md
+- [llvm-armproc]: LLVM `ARMProcessors.td` (`cortex-a7` uses `CortexA8Model`, `HasSlowFPVMLx`, `HasSlowFPVFMx`, `HasVMLxHazards`, `VMLxForwarding`): https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/ARM/ARMProcessors.td
+- [llvm-vmla]: LLVM commit noting VMLA and friends are not fused (separate rounding steps), mirrored copy: https://git.applefritter.com/6502/llvm-6502/commit/48575f6ea7d5cd21ab29ca370f58fcf9ca31400b
+- [armv7arm]: ARMv7-A/R Architecture Reference Manual (VMLA vs VFMA, Advanced SIMD flush-to-zero): https://developer.arm.com/documentation/ddi0406/latest/
+- [a7-neon-trm]: Cortex-A7 NEON Media Processing Engine TRM, ARM DDI 0462 (no instruction timings): https://developer.arm.com/documentation/ddi0462/latest/
+- [ne-a7]: New Electronics, "ARM unveils Cortex-A7 MPCore processor" (in-order 8-stage pipeline): https://newelectronics.co.uk/content/news/arm-unveils-cortex-a7-mpcore-processor
+- Round 1 sources still used: [gcc-arm], [a7-timings].
+
+[gcc-a7md]: https://github.com/gcc-mirror/gcc/blob/master/gcc/config/arm/cortex-a7.md
+[llvm-armproc]: https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/ARM/ARMProcessors.td
+[llvm-vmla]: https://git.applefritter.com/6502/llvm-6502/commit/48575f6ea7d5cd21ab29ca370f58fcf9ca31400b
+[armv7arm]: https://developer.arm.com/documentation/ddi0406/latest/
+[a7-neon-trm]: https://developer.arm.com/documentation/ddi0462/latest/
+[ne-a7]: https://newelectronics.co.uk/content/news/arm-unveils-cortex-a7-mpcore-processor

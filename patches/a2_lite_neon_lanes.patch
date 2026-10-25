@@ -1,0 +1,236 @@
+A2-Lite: NEON kernel with output channels in lanes (4 frames per tile, all taps fused, no vld3,
+no z buffer). Disable at build time with -DNAM_A2_LITE_SCALAR. Round 2, R2-2.
+--- a/NAM/wavenet/a2_fast.cpp	2026-10-24 19:46:26
++++ b/NAM/wavenet/a2_fast.cpp	2026-10-24 19:46:26
+@@ -15,6 +15,9 @@
+   #include <cmath>
+   #include <cstddef>
+   #include <cstring>
++  #if defined(__ARM_NEON)
++    #include <arm_neon.h> // A2-Lite NEON kernel
++  #endif
+   #include <iterator>
+   #include <memory>
+   #include <sstream>
+@@ -91,6 +94,15 @@
+     std::array<float, Channels * Channels> l1x1_w{};
+     std::array<float, Channels> l1x1_b{};
+ 
++    // A2-Lite NEON kernel only: the weights above with every Channels-long column
++    // padded to 4 floats (pad = 0), so one column is one q-register.
++    // conv_w4[(k * Channels + j) * 4 + i] = conv_w[k * C * C + j * C + i].
++    std::vector<float> conv_w4;
++    std::array<float, 4> conv_b4{};
++    std::array<float, 4> mixin_w4{};
++    std::array<float, 4 * Channels> l1x1_w4{};
++    std::array<float, 4> l1x1_b4{};
++
+     // Conv1D input history ring buffer, column-major (Channels rows).
+     std::vector<float> history;
+     std::array<float, Channels> cached_prewarm_state{};
+@@ -179,6 +191,27 @@
+ 
+   _load_weights(weights);
+ 
++  if constexpr (Channels <= 4)
++  {
++    for (auto& L : _layers)
++    {
++      L.conv_w4.assign(static_cast<size_t>(L.kernel_size) * Channels * 4, 0.0f);
++      for (int k = 0; k < L.kernel_size; k++)
++        for (int j = 0; j < Channels; j++)
++          for (int i = 0; i < Channels; i++)
++            L.conv_w4[(static_cast<size_t>(k) * Channels + j) * 4 + i] =
++              L.conv_w[static_cast<size_t>(k) * Channels * Channels + j * Channels + i];
++      for (int i = 0; i < Channels; i++)
++      {
++        L.conv_b4[i] = L.conv_b[i];
++        L.mixin_w4[i] = L.mixin_w[i];
++        L.l1x1_b4[i] = L.l1x1_b[i];
++        for (int j = 0; j < Channels; j++)
++          L.l1x1_w4[j * 4 + i] = L.l1x1_w[j * Channels + i];
++      }
++    }
++  }
++
+   // Receptive field = 1 (the sample being produced) + sum of per-layer lookbacks +
+   // (head kernel - 1). The leading 1 matches the generic WaveNet's prewarm count
+   // (model.cpp: mPrewarmSamples starts at 1 when there's no condition DSP), so the
+@@ -475,6 +508,126 @@
+   #endif
+ }
+ 
++  #if defined(__ARM_NEON) && !defined(NAM_A2_LITE_SCALAR)
++    #define NAM_A2_LITE_NEON 1
++    // clang marks cortex-a7 "slow VMLx" and splits vmlaq_* into vmul + vadd;
++    // re-enable VMLA for this kernel only (GCC emits VMLA for the intrinsics).
++    #if defined(__clang__) && defined(__arm__)
++      #define NAM_A2_LITE_KERNEL __attribute__((noinline, target("no-slowfpvmlx")))
++    #else
++      #define NAM_A2_LITE_KERNEL __attribute__((noinline))
++    #endif
++  #else
++    #define NAM_A2_LITE_NEON 0
++  #endif
++
++  #if NAM_A2_LITE_NEON
++// =============================================================================
++// A2-Lite (3 channels) NEON kernel: output channels in lanes, 4 frames per tile.
++//
++// acc[t] holds frame t's 3 conv outputs in lanes 0-2 (lane 3 = 0 padding), and
++// stays in a q-register across all K taps (no z buffer). Per tap the 3 padded
++// weight columns (3 q) are loaded once and shared by the 4 frames, and the 4
++// frames' inputs are 12 contiguous floats (3 q, no vld3 de-interleave). Each
++// input value is used as a d-register lane by VMLA.F32 Qd, Qn, Dm[x].
++// 4 acc + 3 W + 3 x = 10 q-registers. Per tap: 6 loads + 12 VMLA.
++//
++// Arithmetic order per output is the same as the scalar kernel (bias first,
++// then for each tap input channels 0, 1, 2; then mixin, LeakyReLU, head sum,
++// and lin += ((b + L0*a0) + L1*a1) + L2*a2), and VMLA is not fused, so the
++// result should match the scalar code except where ARMv7 NEON flushes
++// denormals to zero.
++// =============================================================================
++__attribute__((always_inline)) inline void a2_lite_fence(float32x4_t& a, float32x4_t& b, float32x4_t& c,
++                                                         float32x4_t& d)
++{
++  asm volatile("" : "+w"(a), "+w"(b), "+w"(c), "+w"(d));
++}
++
++// [a0 a1 a2 _][b0 b1 b2 _][c0 c1 c2 _][d0 d1 d2 _] -> 12 packed floats as 3 q.
++__attribute__((always_inline)) inline void a2_lite_pack(const float32x4_t (&v)[4], float32x4_t (&o)[3])
++{
++  const float32x2_t l0 = vget_low_f32(v[0]), h0 = vget_high_f32(v[0]);
++  const float32x2_t l1 = vget_low_f32(v[1]), h1 = vget_high_f32(v[1]);
++  const float32x2_t l2 = vget_low_f32(v[2]), h2 = vget_high_f32(v[2]);
++  const float32x2_t l3 = vget_low_f32(v[3]), h3 = vget_high_f32(v[3]);
++  o[0] = vcombine_f32(l0, vzip_f32(h0, l1).val[0]); // a0 a1 a2 b0
++  o[1] = vcombine_f32(vext_f32(l1, h1, 1), l2); //     b1 b2 c0 c1
++  o[2] = vcombine_f32(vzip_f32(h2, l3).val[0], vext_f32(l3, h3, 1)); // c2 d0 d1 d2
++}
++
++template <int K>
++NAM_A2_LITE_KERNEL void a2_lite_tile4(const float* const* __restrict taps, const float* __restrict w4,
++                                      const float* __restrict b4, const float* __restrict m4,
++                                      const float* __restrict l4, const float* __restrict lb4,
++                                      const float* __restrict cond, float* __restrict hsum,
++                                      float* __restrict lin, float leaky_slope)
++{
++  const float32x4_t bias = vld1q_f32(b4);
++  float32x4_t a0 = bias, a1 = bias, a2 = bias, a3 = bias;
++  #if defined(__clang__)
++    #pragma clang loop unroll(disable)
++  #endif
++  for (int k = 0; k < K; k++)
++  {
++    const float* w = w4 + k * 12;
++    const float32x4_t c0 = vld1q_f32(w), c1 = vld1q_f32(w + 4), c2 = vld1q_f32(w + 8);
++    const float* x = taps[k];
++    const float32x4_t x0 = vld1q_f32(x), x1 = vld1q_f32(x + 4), x2 = vld1q_f32(x + 8);
++    const float32x2_t d0 = vget_low_f32(x0), d1 = vget_high_f32(x0);
++    const float32x2_t d2 = vget_low_f32(x1), d3 = vget_high_f32(x1);
++    const float32x2_t d4 = vget_low_f32(x2), d5 = vget_high_f32(x2);
++    // frame:      0         1         2         3
++    // input 0:  d0[0]     d1[1]     d3[0]     d4[1]
++    // input 1:  d0[1]     d2[0]     d3[1]     d5[0]
++    // input 2:  d1[0]     d2[1]     d4[0]     d5[1]
++    a0 = vmlaq_lane_f32(a0, c0, d0, 0);
++    a1 = vmlaq_lane_f32(a1, c0, d1, 1);
++    a2 = vmlaq_lane_f32(a2, c0, d3, 0);
++    a3 = vmlaq_lane_f32(a3, c0, d4, 1);
++    a0 = vmlaq_lane_f32(a0, c1, d0, 1);
++    a1 = vmlaq_lane_f32(a1, c1, d2, 0);
++    a2 = vmlaq_lane_f32(a2, c1, d3, 1);
++    a3 = vmlaq_lane_f32(a3, c1, d5, 0);
++    a0 = vmlaq_lane_f32(a0, c2, d1, 0);
++    a1 = vmlaq_lane_f32(a1, c2, d2, 1);
++    a2 = vmlaq_lane_f32(a2, c2, d4, 0);
++    a3 = vmlaq_lane_f32(a3, c2, d5, 1);
++    a2_lite_fence(a0, a1, a2, a3);
++  }
++
++  // Mixin + LeakyReLU (slope < 1: max(x, slope * x) == (x >= 0 ? x : slope * x)).
++  const float32x4_t m = vld1q_f32(m4);
++  float32x4_t act[4] = {vmlaq_n_f32(a0, m, cond[0]), vmlaq_n_f32(a1, m, cond[1]), vmlaq_n_f32(a2, m, cond[2]),
++                        vmlaq_n_f32(a3, m, cond[3])};
++  for (int t = 0; t < 4; t++)
++    act[t] = vmaxq_f32(act[t], vmulq_n_f32(act[t], leaky_slope));
++
++  // Head sum.
++  float32x4_t packed[3];
++  a2_lite_pack(act, packed);
++  vst1q_f32(hsum, vaddq_f32(vld1q_f32(hsum), packed[0]));
++  vst1q_f32(hsum + 4, vaddq_f32(vld1q_f32(hsum + 4), packed[1]));
++  vst1q_f32(hsum + 8, vaddq_f32(vld1q_f32(hsum + 8), packed[2]));
++
++  // layer1x1 residual: lin += ((b + L0*a0) + L1*a1) + L2*a2.
++  const float32x4_t lw0 = vld1q_f32(l4), lw1 = vld1q_f32(l4 + 4), lw2 = vld1q_f32(l4 + 8);
++  const float32x4_t lb = vld1q_f32(lb4);
++  float32x4_t r[4];
++  for (int t = 0; t < 4; t++)
++  {
++    const float32x2_t lo = vget_low_f32(act[t]), hi = vget_high_f32(act[t]);
++    float32x4_t v = vmlaq_lane_f32(lb, lw0, lo, 0);
++    v = vmlaq_lane_f32(v, lw1, lo, 1);
++    r[t] = vmlaq_lane_f32(v, lw2, hi, 0);
++  }
++  a2_lite_pack(r, packed);
++  vst1q_f32(lin, vaddq_f32(vld1q_f32(lin), packed[0]));
++  vst1q_f32(lin + 4, vaddq_f32(vld1q_f32(lin + 4), packed[1]));
++  vst1q_f32(lin + 8, vaddq_f32(vld1q_f32(lin + 8), packed[2]));
++}
++  #endif // NAM_A2_LITE_NEON
++
+ // -----------------------------------------------------------------------------
+ // Per-layer forward pass. Reads current _layer_in, writes back into _layer_in
+ // after applying dilated conv + mixin + LeakyReLU + layer1x1 residual, and
+@@ -520,6 +673,23 @@
+ 
+   if constexpr (Channels == 3)
+   {
++    int f_begin = 0; // first frame handled by the scalar loops below
++  #if NAM_A2_LITE_NEON
++    {
++      const float* tap0[K];
++      for (int k = 0; k < K; k++)
++        tap0[k] = &L.history[static_cast<size_t>(tap_base_phys(K - 1 - k)) * 3];
++      for (; f_begin + 4 <= num_frames; f_begin += 4)
++      {
++        const float* taps[K];
++        for (int k = 0; k < K; k++)
++          taps[k] = tap0[k] + f_begin * 3;
++        a2_lite_tile4<K>(taps, L.conv_w4.data(), L.conv_b4.data(), L.mixin_w4.data(), L.l1x1_w4.data(),
++                         L.l1x1_b4.data(), cond + f_begin, &_head_sum[static_cast<size_t>(f_begin) * 3],
++                         &_layer_in[static_cast<size_t>(f_begin) * 3], kLeakySlope);
++      }
++    }
++  #endif
+     // Inner 3x3 GEMV fully unrolled: all 9 weights lifted into named consts
+     // before the frame loop, the c-reduction kept in scalar temps a0/a1/a2 so
+     // the compiler keeps them in FP registers across the frame loop. Mirrors
+@@ -535,7 +705,7 @@
+       const float w3 = wk[3], w4 = wk[4], w5 = wk[5];
+       const float w6 = wk[6], w7 = wk[7], w8 = wk[8];
+       const float cb0 = L.conv_b[0], cb1 = L.conv_b[1], cb2 = L.conv_b[2];
+-      for (int f = 0; f < num_frames; f++)
++      for (int f = f_begin; f < num_frames; f++)
+       {
+         const float* src = &L.history[static_cast<size_t>(tap_base + f) * 3];
+         float a0 = cb0 + w0 * src[0];
+@@ -562,7 +732,7 @@
+       const float w0 = wk[0], w1 = wk[1], w2 = wk[2];
+       const float w3 = wk[3], w4 = wk[4], w5 = wk[5];
+       const float w6 = wk[6], w7 = wk[7], w8 = wk[8];
+-      for (int f = 0; f < num_frames; f++)
++      for (int f = f_begin; f < num_frames; f++)
+       {
+         const float* src = &L.history[static_cast<size_t>(tap_base + f) * 3];
+         float* zf = z + static_cast<size_t>(f) * 3;
+@@ -595,7 +765,7 @@
+     const float lw10 = L.l1x1_w[3], lw11 = L.l1x1_w[4], lw12 = L.l1x1_w[5];
+     const float lw20 = L.l1x1_w[6], lw21 = L.l1x1_w[7], lw22 = L.l1x1_w[8];
+     const float lb0 = L.l1x1_b[0], lb1 = L.l1x1_b[1], lb2 = L.l1x1_b[2];
+-    for (int f = 0; f < num_frames; f++)
++    for (int f = f_begin; f < num_frames; f++)
+     {
+       const float* src = &L.history[static_cast<size_t>(tap_base_last + f) * 3];
+       const float* zf_mem = z + static_cast<size_t>(f) * 3;
