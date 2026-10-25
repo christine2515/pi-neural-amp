@@ -18,6 +18,8 @@
 ## WaveNet, one sample's path
 
 The A2 model is a WaveNet run **causally** (output depends only on current and past input).
+For the full walk-through (every shape, a worked example with real weights, figures), see
+[10-wavenet-explained.md](10-wavenet-explained.md).
 
 1. **Rechannel:** input sample → a C-wide vector.
 2. **23 layers**, each:
