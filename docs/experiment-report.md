@@ -4,6 +4,24 @@ Running log of optimization iterations, following [optimization-roadmap.md](opti
 Every number below comes from a CSV in `results-pi/` (pulled from the Pi) via `scripts/kpis.py` or
 the analysis commands shown. Estimates are labeled as estimates.
 
+## Summary (so far)
+
+| | First baseline | Best so far | How |
+|---|---|---|---|
+| **Full**, block 128, p50 | 6,696 µs (251% load, misses every block) | **1,785 µs (67% load)** | NEON kernel (1.91×) + two-core pipeline (1.97×) = **3.75×** |
+| **Full**, smallest clean block (paced) | none | **128–256** samples (0 misses at 256; ~1 in 25,000 at 128) | + 1 block pipeline delay |
+| **Lite**, block 128, p50 | 1,032 µs (39% load) | **849 µs (32%)** | ring mode 0 + NEON kernel (1.22×) |
+| **Lite**, smallest clean block (paced, `--rt`) | — | **32 samples (0.67 ms)**, or 16 pipelined (same total delay) | |
+| Memory (bench PSS minus test file) | ~4 MiB | — | measured, not optimized |
+
+What didn't work, and why (measured): compiler auto-vectorization of Lite (−10%: `vld3`, spills, and
+clang's slow-VMLA model for the A7), Eigen `lazyProduct` for Full (−6%: weights reloaded per column).
+What explains everything: on the Cortex-A7, **every FP form peaks at ~1 float op per cycle**, so
+vectorization only pays by cutting non-arithmetic instructions, and the second core is the big lever.
+
+Waiting on Christine: core isolation (sudo + reboot), PREEMPT_RT kernel, Scarlett connected (live,
+mmap, round-trip latency), I2S hardware.
+
 ## Setup (fixed for all iterations unless an iteration says otherwise)
 
 | | |
@@ -388,3 +406,39 @@ SCHED_FIFO 80 on CPU 3 and the worker SCHED_FIFO 80 on CPU 2. Throttle flags 0x0
 **Status vs the goal.** Full: real time at 128 with a ~1-in-25,000 miss rate; clean at 256 (5.3 ms
 buffer + 5.3 ms pipeline delay). Lite: clean at 32 samples. Next levers for Full's tail: core
 isolation (Christine), a 3-stage pipeline (more latency), or more single-core kernel work.
+
+### Iteration 10: where to split the pipeline (`pipe_split`)
+
+Full, `--pipeline 8 --pipeline-split S`, block 128, burst, 30 s of audio, 2 runs per split
+(`results-pi/summary_pipe_split.csv`):
+
+| Split (first stage-B layer) | p50 | p99 | max | missed / 22,500 |
+|---|---|---|---|---|
+| 11 | 2,057 µs | 2,212 µs | 2,468 µs | 0 |
+| 12 | 1,918 µs | 2,064 µs | 2,905 µs | 2 |
+| **13** | **1,781 µs** | **1,933 µs** | 2,751 µs | 1 |
+| 14 | 1,923 µs | 2,067 µs | 2,974 µs | 2 |
+| 15 | 2,198 µs | 2,362 µs | 3,179 µs | 7 |
+
+**13 is optimal**, matching the cost model (layers 0–12 vs 13–22 + head ≈ 91 vs 88 units: the
+two kernel-15 layers sit at indices 14–15). Each layer moved off balance costs ~140 µs per block.
+Kept as the default.
+
+### Iteration 11: pipelined Lite at 16 samples (`pipe_lite_paced_rt`)
+
+`npipe` build (NEON Lite + pipeline), `--pipeline 3 --rt --cpu 3`, paced, 2 runs each.
+
+| Lite, paced, `--rt` | p50 | p99 | max | missed incl. wake |
+|---|---|---|---|---|
+| 16, unpipelined (`lite_paced_rt`, scalar Lite) | 135 | 173 | 343 | 4 / 416,400 |
+| **16, pipelined** | **60** | **82** | 310 | **0 / 416,400** |
+| 32, unpipelined (`lite_paced_rt`, scalar Lite) | 258 | 299 | 564 | 0 / 208,200 |
+| 32, pipelined | 115 | 140 | 417 | 0 / 208,200 |
+
+(µs. The unpipelined rows are the `ring0` scalar build; the pipelined rows also include the NEON
+Lite kernel, so the speedup mixes both changes.)
+
+**Finding.** Pipelined Lite is clean at 16 samples with p99 at 25% of the deadline. But the
+pipeline adds one block, so 16 + 16 = 32 samples of total delay, the same as unpipelined 32. **For
+Lite, the pipeline buys headroom, not lower latency.** Single-core NEON Lite at 32 samples is the
+simpler configuration with the same latency.

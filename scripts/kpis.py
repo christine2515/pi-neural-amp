@@ -68,7 +68,7 @@ def load_summaries():
 def by_block(summaries):
     groups = defaultdict(list)
     for r in summaries:
-        if r["tag"] in ("boot", "sustained"):
+        if r["tag"] == "boot" or r["tag"].startswith("sustained"):
             continue
         groups[(r["tag"], r["model"], int(r["block"]))].append(r)
     out = []
@@ -185,10 +185,10 @@ def compare(kpis, tags):
     return out
 
 
-def sustained():
-    blocks = os.path.join(RESULTS, "blocks", "sustained", "sustained.csv")
-    summ = os.path.join(RESULTS, "summary_sustained.csv")
-    thermal = os.path.join(RESULTS, "thermal_sustained.csv")
+def sustained(tag="sustained"):
+    blocks = os.path.join(RESULTS, "blocks", tag, "sustained.csv")
+    summ = os.path.join(RESULTS, f"summary_{tag}.csv")
+    thermal = os.path.join(RESULTS, f"thermal_{tag}.csv")
     if not (os.path.exists(blocks) and os.path.exists(summ)):
         return []
     s = read_csv(summ)[-1]
@@ -323,11 +323,15 @@ def main():
             md += ["## " + " vs ".join(args.compare), md_table(cmp_rows, f)]
             with open(os.path.join(RESULTS, "rt_comparison.md"), "w") as fh:
                 fh.write(md_table(cmp_rows, f) + "\n")
-    sus = sustained()
-    if sus:
-        f = list(sus[0].keys())
-        write_csv(os.path.join(RESULTS, "sustained_per_minute.csv"), sus, f)
-        md += ["## Sustained run, per minute", md_table(sus, f)]
+    sus_tags = sorted(os.path.basename(p)[len("summary_"):-4]
+                      for p in glob.glob(os.path.join(RESULTS, "summary_sustained*.csv")))
+    for tag in sus_tags:
+        sus = sustained(tag)
+        if sus:
+            f = list(sus[0].keys())
+            suffix = "" if tag == "sustained" else "_" + tag[len("sustained_"):]
+            write_csv(os.path.join(RESULTS, f"sustained_per_minute{suffix}.csv"), sus, f)
+            md += [f"## Sustained run ({tag}), per minute", md_table(sus, f)]
     bt = boot()
     if bt:
         f = list(bt[0].keys())

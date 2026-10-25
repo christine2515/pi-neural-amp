@@ -5,6 +5,7 @@ Usage: python3 scripts/plot.py [--blocks results/blocks/baseline/<model>__64__r1
 """
 import argparse
 import csv
+import glob
 import os
 from collections import defaultdict
 
@@ -139,7 +140,7 @@ def plot_blocks(path):
     save(fig, "blocks_" + os.path.basename(path).replace(".csv", ".png"))
 
 
-def plot_sustained(rows):
+def plot_sustained(rows, suffix=""):
     if not rows:
         return
     m = [int(r["minute"]) for r in rows]
@@ -154,10 +155,10 @@ def plot_sustained(rows):
     ax2.set_ylabel("temp (°C)")
     ax1.set_title("30-minute sustained run")
     fig.legend(loc="upper left")
-    save(fig, "sustained.png")
+    save(fig, f"sustained{suffix}.png")
 
 
-def plot_thermal(rows):
+def plot_thermal(rows, suffix=""):
     if not rows:
         return
     t0 = float(rows[0]["unix_time"])
@@ -171,7 +172,7 @@ def plot_thermal(rows):
                  for r in rows], lw=0.8)
     ax2.set_ylabel("CPU MHz")
     ax1.set_title("temperature and CPU frequency")
-    save(fig, "thermal.png")
+    save(fig, f"thermal{suffix}.png")
 
 
 def main():
@@ -184,8 +185,11 @@ def main():
         plot_missed(kpis)
     plot_compare(read_csv("rt_comparison.csv"))
     plot_memory(read_csv("kpi_memory.csv"))
-    plot_sustained(read_csv("sustained_per_minute.csv"))
-    plot_thermal(read_csv("thermal_sustained.csv"))
+    for path in sorted(glob.glob(os.path.join(RESULTS, "thermal_sustained*.csv"))):
+        tag = os.path.basename(path)[len("thermal_"):-4]
+        suffix = "" if tag == "sustained" else "_" + tag[len("sustained_"):]
+        plot_sustained(read_csv(f"sustained_per_minute{suffix}.csv"), suffix)
+        plot_thermal(read_csv(path), suffix)
     for b in args.blocks:
         plot_blocks(b)
 
