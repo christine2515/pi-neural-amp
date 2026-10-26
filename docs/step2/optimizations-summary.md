@@ -1,8 +1,8 @@
 # Optimizations summary: every change tried, with its measured effect and status
 
 > **Draft (Claude), 2026-10-25.** One row per optimization, grouped by category. Every number is copied
-> from [experiment-report.md](experiment-report.md), [low-latency-plan.md](low-latency-plan.md),
-> [beyond-fpu.md](beyond-fpu.md) or a CSV in [`results-pi/`](../results-pi/); the tag or file is in each
+> from [experiment-report.md](../experiment-report.md), [low-latency-plan.md](../low-latency-plan.md),
+> [beyond-fpu.md](../beyond-fpu.md) or a CSV in [`results-pi/`](../../results-pi/); the tag or file is in each
 > row. **Estimate** = arithmetic or a cited source, not a Pi measurement. For how the best build runs
 > live, see [state-of-the-union.md](state-of-the-union.md).
 
