@@ -146,11 +146,3 @@ the two is driver + USB overhead (`--bypass` rows show it with no model at all).
 
 `live_latency_summary.csv` shows measured round trip next to the buffer size (period × periods).
 The difference is converter + USB latency. The Reddit Pi 5 post reports 3.5 ms with a Scarlett.
-
-## Resume line: where each number comes from
-| Placeholder | Source |
-|---|---|
-| X ms smallest glitch-free buffer | `kpi_smallest_block.csv` → `latency_ms` (say which model and tag) |
-| Y ms p99 block time | `kpi_by_block.csv` → `p99_us` at that model/block |
-| Z MB memory | `kpi_memory.csv` → `peak_pss_mb` |
-| W% p99 cut by --rt | `rt_comparison.csv` → `p99_change_pct` (pick the row you'll defend; report the range) |

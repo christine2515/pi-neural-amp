@@ -87,16 +87,6 @@ Reproduce: [RUNBOOK.md](RUNBOOK.md). Best build: `-DBENCH_A2_RING_MODE=0` + patc
 
 ![30-minute run](docs/img/sustained.png)
 
-## Resume line (measured numbers only)
-
-**Neural Guitar Amp on Raspberry Pi 2 | C++, ARM NEON, Linux real-time, perf**
-- Built a real-time neural guitar amp on a Raspberry Pi 2 (900 MHz ARM, C++) that went from unable to keep
-  up at any buffer size to playing live with 2 ms of in-device buffer latency (1.3 ms for the lite model) and
-  1 underrun in 10 minutes, using hand-written NEON kernels and lock-free multi-core execution (full model
-  3.8× faster on two cores); output verified identical by null test.
-
-More variants and a fact-check table: [docs/resume-bullet.md](docs/resume-bullet.md).
-
 ## Open items
 
 - **Round-trip latency** (needs an RCA → ¼" loopback cable; `scripts/latency_test.sh` is ready).
@@ -114,6 +104,6 @@ More variants and a fact-check table: [docs/resume-bullet.md](docs/resume-bullet
 | [patches/](patches/) | NAM Core changes, applied to a build-dir copy (never the submodule) |
 | [scripts/](scripts/) | build/deploy, sweeps, profiling, KPI tables, charts, null/hum/gate analysis |
 | [results-pi/](results-pi/) | every CSV quoted here (large per-block traces, WAVs and perf data are not committed) |
-| [docs/](docs/) | experiment report, roadmaps, low-latency plan, beyond-FPU research, live testing, resume bullets |
+| [docs/](docs/) | experiment report, roadmaps, low-latency plan, beyond-FPU research, live testing |
 | [docs/step2/state-of-the-union.md](docs/step2/state-of-the-union.md) | how the audio runs right now: signal chain, threads/cores, recommended `live` commands and their measured numbers |
 | [learning/](learning/) | study notes: real-time audio, WaveNet (with figures), ARM performance, guitars and hum, … |

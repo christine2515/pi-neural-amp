@@ -61,7 +61,7 @@ Source: `results-pi/summary_baseline.csv` → `kpi_by_block.csv`, `kpi_memory_se
   Bigger blocks don't help because load is per sample (~52 µs/sample vs a 20.8 µs budget).
 - **Memory:** peak PSS 16.9 MiB for either model, of which 12.7 MiB is the decoded test file held by
   `bench`. The rest, ~4.0–4.2 MiB, is the model (both submodels are loaded), buffers and libraries.
-  `live`, which streams audio, is where the resume's memory number should come from.
+  `live`, which streams audio, is where a real-world memory number should come from.
 
 ### Control 1: governor (`baseline_ondemand`, earlier run)
 

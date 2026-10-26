@@ -47,7 +47,7 @@ Everything writes CSV to `results/`; analysis goes into `docs/experiment-report.
 - [ ] 🤖 `latency_test.sh` at periods 32/64/128/256 × 2/3 (bypass path): the **interface + driver floor**.
       Compare against buffer size (period × periods) to get the USB/converter overhead.
 - [ ] 🤖 Same with `--rt`, and with `--mmap`.
-- [ ] 🤖 Report: smallest stable configuration and its measured round trip (the number for the resume).
+- [ ] 🤖 Report: smallest stable configuration and its measured round trip.
       Reference: the Reddit Pi 5 post reports 3.5 ms with a Scarlett.
 
 ## 5. Live sweeps: xruns by configuration 🤖 (play or stay silent; timing doesn't depend on the input)
@@ -72,7 +72,7 @@ and `live_smallest_buffer.csv`.
       The Pi 2's USB and Ethernet share one chip.
 - [ ] 30-min live run, Full pipelined at the smallest clean config, with `thermal_logger.py`: xruns per
       minute and temperature.
-- [ ] Memory: `pss_kb` from `live_summary.csv`, the real number for the resume (no test file in memory).
+- [ ] Memory: `pss_kb` from `live_summary.csv`, the real memory number (no test file in memory).
 
 ## 8. Later / needs more from Christine
 - [ ] 🧑 PREEMPT_RT kernel (`rpi-7.1.y`+, cross-compiled), then repeat sections 4–6. Watch the USB FIQ
