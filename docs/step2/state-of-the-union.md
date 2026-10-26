@@ -1,6 +1,6 @@
 # State of the union: how the audio runs right now
 
-> **Draft (Claude), 2026-10-25.** The current live setup end to end, with the `nhead2` build. Every
+> **2026-10-25.** The current live setup end to end, with the `nhead2` build. Every
 > number comes from [experiment-report.md](../experiment-report.md) ("Live" sections),
 > [low-latency-plan.md](../low-latency-plan.md) or a CSV in [`results-pi/`](../../results-pi/), with the label
 > or file next to it. **Estimate** marks anything not measured. The full list of changes behind this

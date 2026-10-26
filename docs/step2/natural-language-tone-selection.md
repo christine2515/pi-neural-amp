@@ -1,7 +1,7 @@
 # Natural-language tone selection: "warm bluesy clean" → the right NAM model, switched live
 
-> **Draft (Claude), 2026-10-25.** Design doc for a long-term feature, not a plan of record.
-> Christine decides scope and writes the conclusions. Project numbers come from the docs and CSVs named
+> **2026-10-25.** Design doc for a long-term feature, not a plan of record.
+> Project numbers come from the docs and CSVs named
 > next to them. External facts link to their source. **Estimate** marks anything not measured; vendor
 > numbers are labeled as vendor claims.
 

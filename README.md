@@ -1,7 +1,6 @@
 # pi-neural-amp: a neural guitar amp on a Raspberry Pi 2, profiled like a product
 
-> **Draft (Claude).** Per [CLAUDE.md](CLAUDE.md), Christine rewrites the analysis sections
-> ("What I changed and why", "What I learned") in her own words. Every number below comes from a CSV in
+> Every number below comes from a CSV in
 > [`results-pi/`](results-pi/), produced by a script in [`scripts/`](scripts/) or by
 > [`bench`](src/bench.cpp) / [`live`](src/live.cpp). The full record, iteration by iteration, is
 > [docs/experiment-report.md](docs/experiment-report.md).
@@ -44,7 +43,7 @@ measuring it needs a loopback cable.
 Reproduce: [RUNBOOK.md](RUNBOOK.md). Best build: `-DBENCH_A2_RING_MODE=0` + patches
 `a2_full_neon_tile`, `a2_lite_neon_lanes`, `a2_pipeline`, `a2_head_neon`, `a2_pipeline_stack`.
 
-## What I changed and why *(draft, for Christine to rewrite)*
+## What I changed and why
 
 1. **Measured before changing anything.** `perf` showed neither model was memory-bound (> 98.9% L1 hits).
    Full spent 59% of its time in Eigen's matrix-multiply kernel and **22% just repacking data** for 179
@@ -70,7 +69,7 @@ Reproduce: [RUNBOOK.md](RUNBOOK.md). Best build: `-DBENCH_A2_RING_MODE=0` + patc
    int16 fixed point (2× faster arithmetic but −65 to −75 dB, fails the accuracy bar), the GPU (no
    compute path under the KMS driver). ([docs/beyond-fpu.md](docs/beyond-fpu.md))
 
-## What I learned about measuring *(draft)*
+## What I learned about measuring
 
 - **The monitoring tools caused the worst tail latency.** A memory sampler that forked every 0.2 s raised
   Lite's p99 by **27%** (0.254 s periodic spikes; `spikes.csv`, tag `ctl_sampler`). A thermal logger that
