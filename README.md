@@ -104,6 +104,7 @@ More variants and a fact-check table: [docs/resume-bullet.md](docs/resume-bullet
 - **Frame split** (`patches/a2_frame_split.patch`): same speed as the pipeline without its extra block,
   943 µs per block on 4 cores offline, bit-identical; not yet run live ([docs/low-latency-plan.md](docs/low-latency-plan.md)).
 - **I2S converters** instead of USB: the only route to round trips under ~2 ms (estimate).
+- Status of every optimization (adopted, rejected, pending, needs Christine): [docs/optimizations-summary.md](docs/optimizations-summary.md).
 
 ## Repo map
 
@@ -114,4 +115,5 @@ More variants and a fact-check table: [docs/resume-bullet.md](docs/resume-bullet
 | [scripts/](scripts/) | build/deploy, sweeps, profiling, KPI tables, charts, null/hum/gate analysis |
 | [results-pi/](results-pi/) | every CSV quoted here (large per-block traces, WAVs and perf data are not committed) |
 | [docs/](docs/) | experiment report, roadmaps, low-latency plan, beyond-FPU research, live testing, resume bullets |
+| [docs/state-of-the-union.md](docs/state-of-the-union.md) | how the audio runs right now: signal chain, threads/cores, recommended `live` commands and their measured numbers |
 | [learning/](learning/) | study notes: real-time audio, WaveNet (with figures), ARM performance, guitars and hum, … |
