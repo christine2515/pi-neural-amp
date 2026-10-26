@@ -703,3 +703,17 @@ the 10 quietest 0.1 s windows:
 
 Offline on the same recording, playing passages were unchanged (0.0 dB). The gated take had 2 underruns in
 30 s (max 1,992 µs).
+
+### Live, 10 minutes: Full pipelined at 64 × 2 (`live10_full_pipe_64x2`)
+
+`nhead2` build, `--pipeline 8 --rt --cpu 3`, 64 × 2 periods (2.67 ms ALSA buffer + 64-sample pipeline
+= 4.0 ms in-device buffering), 600 s, fork-free thermal logger. Per-period data: `results-pi/live10_periods.csv`.
+
+- **1 underrun in 450,000 periods** (10 minutes).
+- Model time p50 967 µs, p99 1,084 µs, max 1,709 µs (deadline 1,333 µs). **43 periods (0.01%) took
+  longer than one period**, mostly by < 100 µs. The 2-period buffer absorbed all but one of them, so a
+  compute overrun isn't automatically an audible glitch.
+- Temperature 37.9 → 46.5 °C; no new throttling (the start reading's 0x50000 is the earlier under-voltage
+  event at plug-in, which is sticky since boot).
+- PSS 12.8 MB in this run: `live`'s preallocated per-period timing arrays grow with `--duration`
+  (450,000 × 16 bytes ≈ 7 MB here). The model's own footprint is the 5.8 MB measured in the 15 s run.
