@@ -1,0 +1,6 @@
+# started on Sun Oct 25 03:12:30 2026
+
+3719735454,,cycles:u,4232292514,100.00,,
+1303144417,,instructions:u,4232292514,100.00,0.35,insn per cycle
+68931477,,branches:u,4232292514,100.00,,
+8835702,,branch-misses:u,4232292514,100.00,12.82,of all branches

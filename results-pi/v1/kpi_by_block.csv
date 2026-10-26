@@ -1,0 +1,5 @@
+tag,model,block,deadline_ms,runs,p50_us,p99_us,p99_us_worst_run,max_us,missed,measured_blocks,missed_pct,p99_pct_of_deadline,dsp_load_pct,wake_p99_us,wake_max_us,missed_with_wake,governor,paced,rt,isolated_cpus,kernel
+clang,a2_fender_super_reverb.nam@full,128,2.66667,1,6708.8,7713.74,7713.74,8464.11,26025,26025,100.0,289.2648884188895,255.58,0.0,0.0,26025,ondemand,0,0,none,6.18.50+rpt-rpi-v7 none
+clang,a2_fender_super_reverb.nam@lite,128,2.66667,1,1029.01,1383.59,1383.59,1830.99,0,26025,0.0,51.88456014429982,39.8403,0.0,0.0,0,ondemand,0,0,none,6.18.50+rpt-rpi-v7 none
+gcc,a2_fender_super_reverb.nam@full,128,2.66667,1,6685.88,7625.72,7625.72,7896.14,26025,26025,100.0,285.9641425448218,254.419,0.0,0.0,26025,ondemand,0,0,none,6.18.50+rpt-rpi-v7 none
+gcc,a2_fender_super_reverb.nam@lite,128,2.66667,1,964.373,1257.45,1257.45,1580.73,0,26025,0.0,47.15431605710493,37.2644,0.0,0.0,0,ondemand,0,0,none,6.18.50+rpt-rpi-v7 none

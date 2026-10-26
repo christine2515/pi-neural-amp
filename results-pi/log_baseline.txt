@@ -1,0 +1,8 @@
+sweep tag=baseline mode=burst extra='' models=1 blocks='128' repeats=3
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=1023.5us p99=1070.6us max=1374.5us missed=0/26025 (0.000%) load=38.5% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=1034.7us p99=1091.6us max=1704.8us missed=0/26025 (0.000%) load=38.9% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=1032.5us p99=1099.1us max=1703.6us missed=0/26025 (0.000%) load=38.9% cpu=100.0%
+a2_fender_super_reverb.nam@full block=128 deadline=2666.7us p50=6668.0us p99=6805.3us max=7280.8us missed=26025/26025 (100.000%) load=249.9% cpu=100.0%
+a2_fender_super_reverb.nam@full block=128 deadline=2666.7us p50=6718.6us p99=6935.3us max=7845.3us missed=26025/26025 (100.000%) load=251.9% cpu=100.0%
+a2_fender_super_reverb.nam@full block=128 deadline=2666.7us p50=6696.2us p99=6924.7us max=7701.6us missed=26025/26025 (100.000%) load=251.0% cpu=100.0%
+wrote results/summary_baseline.csv

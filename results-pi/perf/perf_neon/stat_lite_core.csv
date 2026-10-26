@@ -1,0 +1,6 @@
+# started on Sat Oct 24 20:08:37 2026
+
+6120617517,,cycles:u,6904827000,100.00,,
+2053604557,,instructions:u,6904827000,100.00,0.34,insn per cycle
+70735697,,branches:u,6904827000,100.00,,
+3224135,,branch-misses:u,6904827000,100.00,4.56,of all branches

@@ -1,0 +1,3 @@
+phase,unix_time,scaling_cur_freq_khz,under_voltage_alarm,throttled_hex,under_voltage_now,freq_capped_now,throttled_now,soft_temp_limit_now,under_voltage_ever,freq_capped_ever,throttled_ever,soft_temp_limit_ever
+start,1792905417.200,900000,0,0x0,0,0,0,0,0,0,0,0
+end,1792907313.209,900000,0,0x0,0,0,0,0,0,0,0,0

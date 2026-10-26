@@ -1,0 +1,3 @@
+file,seconds,quiet_windows,quiet_dry_rms_dbfs,quiet_amp_ac_dbfs,quiet_amp_dc_dbfs,playing_windows,playing_amp_rms_dbfs
+live_full_pipe_64x2.wav,30.0,10,-72.5,-58.3,-70.0,0,
+live_full_pipe_64x2_gate50.wav,30.0,10,-77.9,-88.5,-70.3,223,-16.5

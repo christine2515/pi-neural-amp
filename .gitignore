@@ -16,3 +16,6 @@ build-armhf*/
 results-pi/blocks/
 results-pi/*.wav
 results-pi/*.data*
+results-pi/*_periods.csv
+results-pi/recordings/
+results-pi/hum/

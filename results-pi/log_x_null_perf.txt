@@ -1,0 +1,30 @@
+a2_fender_super_reverb.nam@lite block=32 deadline=666.7us p50=217.6us p99=261.5us max=388.1us missed=0/15000 (0.000%) load=33.1% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=32 deadline=666.7us p50=121.2us p99=10154.3us max=20462.8us missed=251/15000 (1.673%) load=41.7% cpu=199.7%
+unix_time=1792922750, label=x_fsplit2_slim0.25, reference=nhead_0.25.wav, candidate=fsplit2_0.25.wav, samples=483200, shift=0, max_abs_diff=0.000e+00, max_abs_diff_dbfs=-inf, rms_diff=0.000e+00, residual_db_rel_ref=-inf
+a2_fender_super_reverb.nam@lite block=32 deadline=666.7us p50=95.7us p99=10132.9us max=259999.3us missed=253/15000 (1.687%) load=66.0% cpu=298.6%
+unix_time=1792922766, label=x_fsplit3_slim0.25, reference=nhead_0.25.wav, candidate=fsplit3_0.25.wav, samples=483200, shift=0, max_abs_diff=0.000e+00, max_abs_diff_dbfs=-inf, rms_diff=0.000e+00, residual_db_rel_ref=-inf
+a2_fender_super_reverb.nam@lite block=32 deadline=666.7us p50=74.3us p99=140.0us max=279975.5us missed=148/15000 (0.987%) load=95.9% cpu=399.6%
+unix_time=1792922784, label=x_fsplit4_slim0.25, reference=nhead_0.25.wav, candidate=fsplit4_0.25.wav, samples=483200, shift=0, max_abs_diff=0.000e+00, max_abs_diff_dbfs=-inf, rms_diff=0.000e+00, residual_db_rel_ref=-inf
+a2_fender_super_reverb.nam@full block=32 deadline=666.7us p50=869.9us p99=991.8us max=1245.9us missed=15000/15000 (100.000%) load=131.9% cpu=100.0%
+a2_fender_super_reverb.nam@full block=32 deadline=666.7us p50=460.3us p99=10535.5us max=20519.5us missed=706/15000 (4.707%) load=141.4% cpu=199.9%
+unix_time=1792922821, label=x_fsplit2_slim1, reference=nhead_1.wav, candidate=fsplit2_1.wav, samples=483200, shift=0, max_abs_diff=0.000e+00, max_abs_diff_dbfs=-inf, rms_diff=0.000e+00, residual_db_rel_ref=-inf
+a2_fender_super_reverb.nam@full block=32 deadline=666.7us p50=350.3us p99=260000.5us max=263213.1us missed=1275/15000 (8.500%) load=2070.1% cpu=299.9%
+unix_time=1792923038, label=x_fsplit3_slim1, reference=nhead_1.wav, candidate=fsplit3_1.wav, samples=483200, shift=0, max_abs_diff=0.000e+00, max_abs_diff_dbfs=-inf, rms_diff=0.000e+00, residual_db_rel_ref=-inf
+a2_fender_super_reverb.nam@full block=32 deadline=666.7us p50=252.0us p99=259998.5us max=310019.1us missed=759/15000 (5.060%) load=1032.1% cpu=399.6%
+unix_time=1792923150, label=x_fsplit4_slim1, reference=nhead_1.wav, candidate=fsplit4_1.wav, samples=483200, shift=0, max_abs_diff=0.000e+00, max_abs_diff_dbfs=-inf, rms_diff=0.000e+00, residual_db_rel_ref=-inf
+done SET=nulltest
+a2_fender_super_reverb.nam@lite block=8 deadline=166.7us p50=60.7us p99=87.5us max=335.4us missed=7/60000 (0.012%) load=37.4% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=8 deadline=166.7us p50=61.8us p99=90.7us max=429.4us missed=12/60000 (0.020%) load=37.9% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=8 deadline=166.7us p50=61.6us p99=87.7us max=424.8us missed=8/60000 (0.013%) load=37.8% cpu=100.0%
+a2_fender_super_reverb.nam@full block=8 deadline=166.7us p50=233.0us p99=302.7us max=715.3us missed=60000/60000 (100.000%) load=142.1% cpu=100.0%
+a2_fender_super_reverb.nam@full block=8 deadline=166.7us p50=229.7us p99=310.5us max=591.2us missed=60000/60000 (100.000%) load=140.2% cpu=100.0%
+a2_fender_super_reverb.nam@full block=8 deadline=166.7us p50=231.4us p99=317.1us max=757.7us missed=60000/60000 (100.000%) load=141.3% cpu=100.0%
+wrote results/perf/x_perf_n8
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=848.7us p99=959.2us max=1383.6us missed=0/3750 (0.000%) load=32.2% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=843.3us p99=918.1us max=1348.8us missed=0/3750 (0.000%) load=31.9% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=852.7us p99=926.5us max=1214.5us missed=0/3750 (0.000%) load=32.2% cpu=100.0%
+a2_fender_super_reverb.nam@full block=128 deadline=2666.7us p50=3479.1us p99=3700.9us max=3959.1us missed=3750/3750 (100.000%) load=131.0% cpu=100.0%
+a2_fender_super_reverb.nam@full block=128 deadline=2666.7us p50=3472.0us p99=3702.3us max=4511.7us missed=3750/3750 (100.000%) load=130.7% cpu=99.9%
+a2_fender_super_reverb.nam@full block=128 deadline=2666.7us p50=3508.1us p99=3803.3us max=4654.8us missed=3750/3750 (100.000%) load=132.2% cpu=100.0%
+wrote results/perf/x_perf_n128
+done SET=perf_smalln

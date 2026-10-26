@@ -1,0 +1,30 @@
+sweep tag=clangref mode=burst extra='' models=1 blocks='128' repeats=3
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=850.4us p99=937.6us max=2186.3us missed=0/26025 (0.000%) load=32.2% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=854.7us p99=931.8us max=1321.5us missed=0/26025 (0.000%) load=32.3% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=859.1us p99=932.2us max=1448.7us missed=0/26025 (0.000%) load=32.5% cpu=100.0%
+wrote results/summary_clangref.csv
+sweep tag=clangref mode=burst extra='--pipeline 8' models=1 blocks='128' repeats=3
+a2_fender_super_reverb.nam@full+pipe block=128 deadline=2666.7us p50=1785.8us p99=1971.5us max=2513.4us missed=0/26025 (0.000%) load=67.6% cpu=200.0%
+a2_fender_super_reverb.nam@full+pipe block=128 deadline=2666.7us p50=1781.6us p99=1932.0us max=2314.8us missed=0/26025 (0.000%) load=67.3% cpu=199.9%
+a2_fender_super_reverb.nam@full+pipe block=128 deadline=2666.7us p50=1789.0us p99=1937.7us max=2758.2us missed=2/26025 (0.008%) load=67.6% cpu=200.0%
+wrote results/summary_clangref.csv
+sweep tag=gcc14 mode=burst extra='' models=1 blocks='128' repeats=3
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=813.0us p99=891.9us max=1355.2us missed=0/26025 (0.000%) load=30.8% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=799.2us p99=874.5us max=1098.1us missed=0/26025 (0.000%) load=30.3% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=800.6us p99=885.5us max=1211.0us missed=0/26025 (0.000%) load=30.4% cpu=100.0%
+wrote results/summary_gcc14.csv
+sweep tag=gcc14 mode=burst extra='--pipeline 8' models=1 blocks='128' repeats=3
+a2_fender_super_reverb.nam@full+pipe block=128 deadline=2666.7us p50=2261.2us p99=2405.4us max=3235.3us missed=16/26025 (0.061%) load=85.2% cpu=199.9%
+a2_fender_super_reverb.nam@full+pipe block=128 deadline=2666.7us p50=2249.1us p99=2398.5us max=3191.0us missed=7/26025 (0.027%) load=84.7% cpu=200.0%
+a2_fender_super_reverb.nam@full+pipe block=128 deadline=2666.7us p50=2242.3us p99=2390.9us max=2846.5us missed=7/26025 (0.027%) load=84.5% cpu=200.0%
+wrote results/summary_gcc14.csv
+sweep tag=head mode=burst extra='' models=1 blocks='128' repeats=3
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=841.4us p99=916.8us max=1477.3us missed=0/26025 (0.000%) load=31.9% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=842.6us p99=917.7us max=1390.3us missed=0/26025 (0.000%) load=31.9% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=843.6us p99=917.0us max=1378.5us missed=0/26025 (0.000%) load=31.9% cpu=100.0%
+wrote results/summary_head.csv
+sweep tag=head mode=burst extra='--pipeline 8' models=1 blocks='128' repeats=3
+a2_fender_super_reverb.nam@full+pipe block=128 deadline=2666.7us p50=1763.1us p99=1896.1us max=2549.7us missed=0/26025 (0.000%) load=66.4% cpu=200.0%
+a2_fender_super_reverb.nam@full+pipe block=128 deadline=2666.7us p50=1784.8us p99=1915.7us max=2749.5us missed=2/26025 (0.008%) load=67.3% cpu=199.9%
+a2_fender_super_reverb.nam@full+pipe block=128 deadline=2666.7us p50=1766.9us p99=1910.4us max=2792.1us missed=2/26025 (0.008%) load=66.7% cpu=200.0%
+wrote results/summary_head.csv

@@ -1,0 +1,9 @@
+unix_time,label,reference,candidate,samples,shift,max_abs_diff,max_abs_diff_dbfs,rms_diff,residual_db_rel_ref
+1792920251,x_lite_vs_full,full.wav,lite.wav,972800,0,2.567e-01,-11.8,2.359e-02,-14.3
+1792920252,x_full_rank2,full.wav,rank2.wav,972800,0,2.180e-01,-13.2,3.410e-02,-11.1
+1792920253,x_full_rank3,full.wav,rank3.wav,972800,0,1.447e-01,-16.8,1.972e-02,-15.9
+1792920254,x_full_rank4,full.wav,rank4.wav,972800,0,9.519e-02,-20.4,1.298e-02,-19.5
+1792920255,x_full_rank6,full.wav,rank6.wav,972800,0,3.641e-02,-28.8,3.910e-03,-29.9
+1792920255,x_full_l1rank4,full.wav,l1rank4.wav,972800,0,2.253e-01,-12.9,3.723e-02,-10.4
+1792920256,x_full_prune1,full.wav,prune1.wav,972800,0,3.235e-01,-9.8,6.159e-02,-6.0
+1792920257,x_full_prune2,full.wav,prune2.wav,972800,0,4.266e-01,-7.4,6.687e-02,-5.3

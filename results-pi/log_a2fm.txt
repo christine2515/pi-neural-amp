@@ -1,0 +1,8 @@
+sweep tag=a2fm mode=burst extra='' models=1 blocks='128' repeats=3
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=1141.4us p99=1197.3us max=1515.2us missed=0/26025 (0.000%) load=42.8% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=1137.1us p99=1190.3us max=1508.0us missed=0/26025 (0.000%) load=42.7% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=1139.6us p99=1195.0us max=1465.8us missed=0/26025 (0.000%) load=42.8% cpu=100.0%
+a2_fender_super_reverb.nam@full block=128 deadline=2666.7us p50=6760.2us p99=6978.6us max=7744.3us missed=26025/26025 (100.000%) load=253.5% cpu=100.0%
+a2_fender_super_reverb.nam@full block=128 deadline=2666.7us p50=6738.5us p99=6957.7us max=7620.7us missed=26025/26025 (100.000%) load=252.7% cpu=100.0%
+a2_fender_super_reverb.nam@full block=128 deadline=2666.7us p50=6712.5us p99=6926.9us max=7504.6us missed=26025/26025 (100.000%) load=251.6% cpu=100.0%
+wrote results/summary_a2fm.csv

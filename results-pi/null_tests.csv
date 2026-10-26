@@ -1,0 +1,8 @@
+unix_time,label,reference,candidate,samples,max_abs_diff,max_abs_diff_dbfs,rms_diff,residual_db_rel_ref
+1792895486,ring0_vs_base_slim0.25,render_base_slim0.25.wav,render_ring0_slim0.25.wav,492800,0.000e+00,-inf,0.000e+00,-inf
+1792895486,ring0_vs_base_slim1,render_base_slim1.wav,render_ring0_slim1.wav,492800,0.000e+00,-inf,0.000e+00,-inf
+1792897708,neon_vs_ring0_slim0.25,render_ring0_slim0.25.wav,render_nboth_slim0.25.wav,492800,0.000e+00,-inf,0.000e+00,-inf
+1792897708,neon_vs_ring0_slim1,render_ring0_slim1.wav,render_nboth_slim1.wav,492800,2.682e-07,-131.4,3.237e-08,-132.8
+1792898694,pipe_vs_neon_full,render_nboth_slim1.wav,render_npipe_slim1.wav,492672,128,0.000e+00,-inf,0.000e+00,-inf
+1792915794,head_vs_neon_slim0.25,render_nboth_slim0.25.wav,render_nhead_slim0.25.wav,492800,0,2.384e-07,-132.5,2.303e-08,-135.7
+1792915795,head_vs_neon_slim1,render_nboth_slim1.wav,render_nhead_slim1.wav,492800,0,5.066e-07,-125.9,4.472e-08,-129.9

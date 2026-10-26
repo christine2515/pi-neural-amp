@@ -1,0 +1,5 @@
+sweep tag=lazy mode=burst extra='' models=1 blocks='128' repeats=3
+a2_fender_super_reverb.nam@full block=128 deadline=2666.7us p50=7039.6us p99=7234.4us max=7691.2us missed=26025/26025 (100.000%) load=264.0% cpu=100.0%
+a2_fender_super_reverb.nam@full block=128 deadline=2666.7us p50=7107.6us p99=7320.1us max=8092.4us missed=26025/26025 (100.000%) load=266.6% cpu=100.0%
+a2_fender_super_reverb.nam@full block=128 deadline=2666.7us p50=7099.3us p99=7320.5us max=8252.6us missed=26025/26025 (100.000%) load=266.3% cpu=100.0%
+wrote results/summary_lazy.csv

@@ -1,0 +1,22 @@
+sweep tag=x_smallN_burst mode=burst extra='--duration 30 --rt --cpu 3' models=1 blocks='8 16 32 64 128' repeats=2
+a2_fender_super_reverb.nam@lite block=8 deadline=166.7us p50=61.1us p99=84.1us max=417.0us missed=17/180000 (0.009%) load=37.5% cpu=100.0% rt
+a2_fender_super_reverb.nam@lite block=8 deadline=166.7us p50=61.4us p99=89.1us max=21599.7us missed=60/180000 (0.033%) load=37.9% cpu=99.8% rt
+a2_fender_super_reverb.nam@lite block=16 deadline=333.3us p50=112.3us p99=149.9us max=462.9us missed=6/90000 (0.007%) load=34.5% cpu=100.0% rt
+a2_fender_super_reverb.nam@lite block=16 deadline=333.3us p50=112.7us p99=152.1us max=611.9us missed=16/90000 (0.018%) load=34.8% cpu=100.0% rt
+a2_fender_super_reverb.nam@lite block=32 deadline=666.7us p50=216.1us p99=258.0us max=511.4us missed=0/45000 (0.000%) load=33.0% cpu=100.0% rt
+a2_fender_super_reverb.nam@lite block=32 deadline=666.7us p50=216.2us p99=258.4us max=568.2us missed=0/45000 (0.000%) load=33.0% cpu=100.0% rt
+a2_fender_super_reverb.nam@lite block=64 deadline=1333.3us p50=425.4us p99=500.7us max=1359.7us missed=1/22500 (0.004%) load=32.5% cpu=100.0% rt
+a2_fender_super_reverb.nam@lite block=64 deadline=1333.3us p50=425.9us p99=481.6us max=921.3us missed=0/22500 (0.000%) load=32.4% cpu=100.0% rt
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=840.7us p99=909.6us max=1295.4us missed=0/11250 (0.000%) load=31.8% cpu=100.0% rt
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=840.4us p99=909.3us max=1679.6us missed=0/11250 (0.000%) load=31.9% cpu=100.0% rt
+a2_fender_super_reverb.nam@full block=8 deadline=166.7us p50=227.0us p99=296.2us max=703.4us missed=180000/180000 (100.000%) load=138.3% cpu=100.0% rt
+a2_fender_super_reverb.nam@full block=8 deadline=166.7us p50=226.1us p99=286.1us max=683.6us missed=180000/180000 (100.000%) load=137.8% cpu=100.0% rt
+a2_fender_super_reverb.nam@full block=16 deadline=333.3us p50=441.8us p99=547.1us max=1187.1us missed=90000/90000 (100.000%) load=135.0% cpu=100.0% rt
+a2_fender_super_reverb.nam@full block=16 deadline=333.3us p50=444.8us p99=550.5us max=1182.8us missed=90000/90000 (100.000%) load=135.8% cpu=100.0% rt
+a2_fender_super_reverb.nam@full block=32 deadline=666.7us p50=867.8us p99=1032.2us max=1855.5us missed=45000/45000 (100.000%) load=131.8% cpu=100.0% rt
+a2_fender_super_reverb.nam@full block=32 deadline=666.7us p50=866.8us p99=1060.4us max=2005.5us missed=45000/45000 (100.000%) load=131.9% cpu=100.0% rt
+a2_fender_super_reverb.nam@full block=64 deadline=1333.3us p50=1736.5us p99=1988.1us max=3414.3us missed=22500/22500 (100.000%) load=131.5% cpu=100.0% rt
+a2_fender_super_reverb.nam@full block=64 deadline=1333.3us p50=1748.4us p99=2021.1us max=3252.6us missed=22500/22500 (100.000%) load=132.4% cpu=100.0% rt
+a2_fender_super_reverb.nam@full block=128 deadline=2666.7us p50=3471.8us p99=3936.1us max=6556.2us missed=11250/11250 (100.000%) load=131.3% cpu=100.0% rt
+a2_fender_super_reverb.nam@full block=128 deadline=2666.7us p50=3450.2us p99=3821.7us max=6148.1us missed=11250/11250 (100.000%) load=130.1% cpu=100.0% rt
+wrote results/summary_x_smallN_burst.csv

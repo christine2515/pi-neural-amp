@@ -1,0 +1,6 @@
+# started on Sat Oct 24 18:51:30 2026
+
+45440153573,,cycles:u,50980022498,100.00,,
+198153685,,LLC-loads,50980022498,100.00,,
+14928274,,LLC-load-misses,50980022498,100.00,7.53,of all LL-cache accesses
+2265202,,L1-icache-load-misses,50980022498,100.00,,

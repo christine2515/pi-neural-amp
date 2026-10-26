@@ -1,0 +1,6 @@
+# started on Sat Oct 24 19:21:04 2026
+
+48251659527,,cycles:u,54100854437,100.00,,
+14568898278,,L1-dcache-loads,54100854437,100.00,,
+71838776,,L1-dcache-load-misses,54100854437,100.00,0.49,of all L1-dcache accesses
+275809,,dTLB-load-misses,54100854437,100.00,,

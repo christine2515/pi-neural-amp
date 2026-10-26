@@ -1,0 +1,51 @@
+unix_time,host,variant,kind,macs_per_body,instructions,seconds,cycles_per_instr,macs_per_cycle,mhz_assumed,rt
+1792918888,pi-amp,"vmla.i16 q indep",mac,64,1.6e+08,0.378484,2.12897,3.75768,900,1
+1792918888,pi-amp,"vmla.i16 q by-scalar indep",mac,64,1.6e+08,0.378559,2.1294,3.75693,900,1
+1792918889,pi-amp,"vmla.i16 d indep",mac,32,1.6e+08,0.20051,1.12787,3.54651,900,1
+1792918890,pi-amp,"vmla.i32 q indep",mac,32,1.6e+08,0.734762,4.13304,0.967812,900,1
+1792918891,pi-amp,"vmlal.s16 (16x16->32) indep",mac,32,1.6e+08,0.378564,2.12942,1.87844,900,1
+1792918892,pi-amp,"vmlal.s16 by-scalar indep",mac,32,1.6e+08,0.378506,2.1291,1.87873,900,1
+1792918893,pi-amp,"vmlal.s8 (8x8->16) indep",mac,64,1.6e+08,0.379171,2.13284,3.75087,900,1
+1792918893,pi-amp,"vqdmlal.s16 (sat. doubling) indep",mac,32,1.6e+08,0.378408,2.12854,1.87922,900,1
+1792918894,pi-amp,"vmull.s16 indep",mul,32,1.6e+08,0.378578,2.1295,1.87837,900,1
+1792918896,pi-amp,"vqdmulh.s16 q indep",mul,64,1.6e+08,0.734706,4.13272,1.93577,900,1
+1792918897,pi-amp,"vqrdmulh.s16 q indep",mul,64,1.6e+08,0.734809,4.1333,1.9355,900,1
+1792918899,pi-amp,"vqrdmulh.s16 q by-scalar indep",mul,64,1.6e+08,0.735066,4.13475,1.93482,900,1
+1792918900,pi-amp,"vqrdmulh.s32 q indep",mul,32,1.6e+08,0.735099,4.13493,0.967368,900,1
+1792918901,pi-amp,"vmul.i16 q indep",mul,64,1.6e+08,0.378471,2.1289,3.75782,900,1
+1792918902,pi-amp,"vadd.i16 q indep",add,64,1.6e+08,0.378417,2.1286,3.75835,900,1
+1792918902,pi-amp,"vadd.i32 q indep",add,32,1.6e+08,0.378673,2.13003,1.8779,900,1
+1792918903,pi-amp,"vqadd.s16 q indep",add,64,1.6e+08,0.379246,2.13326,3.75013,900,1
+1792918904,pi-amp,"vmax.s16 q indep",other,64,1.6e+08,0.378436,2.1287,3.75816,900,1
+1792918904,pi-amp,"vqrshrn.s32 #15 (narrow 32->16) indep",other,32,1.6e+08,0.200455,1.12756,3.54749,900,1
+1792918905,pi-amp,"vmlal.s16 by-scalar + vld1.16 d (1:1)",mixed,16,1.6e+08,0.289372,1.62772,1.22872,900,1
+1792918906,pi-amp,"vmla.i16 q by-scalar + vld1.16 q (1:1)",mixed,32,1.6e+08,0.378416,2.12859,1.87918,900,1
+1792918907,pi-amp,"vmla.f32 q by-scalar + vld1.32 q (1:1)",mixed,16,1.6e+08,0.913137,5.13639,0.389378,900,1
+1792918911,pi-amp,"conv-tile mix f32: 4 vld1 q + 4 vld1 d + 16 vmla.f32 q by-scalar",mixed,64,4.8e+08,1.78108,3.33952,0.798518,900,1
+1792918916,pi-amp,"conv-tile mix f32, loads interleaved (clang order)",mixed,64,4.8e+08,2.40486,4.5091,0.591396,900,1
+1792918917,pi-amp,"conv-tile mix s16: 2 vld1 q + 1 vld1 q + 16 vmlal.s16 by-scalar",mixed,64,3.8e+08,0.868267,2.05642,1.638,900,1
+1792918919,pi-amp,"vmla.i16 q chain (latency)",latency,64,1.6e+08,0.712443,4.00749,1.99626,900,1
+1792918920,pi-amp,"vmlal.s16 chain (latency)",latency,32,1.6e+08,0.712438,4.00747,0.998137,900,1
+1792918922,pi-amp,"vqrdmulh.s16 q chain (latency)",latency,64,1.6e+08,0.7346,4.13213,1.93605,900,1
+1792918923,pi-amp,"vadd.i16 q chain (latency)",latency,64,1.6e+08,0.712461,4.0076,1.99621,900,1
+1792918924,pi-amp,"mla (32x32+32) indep",mac,8,1.6e+08,0.200338,1.1269,0.887389,900,1
+1792918924,pi-amp,"smlabb (16x16+32) indep",mac,8,1.6e+08,0.201042,1.13086,0.884282,900,1
+1792918924,pi-amp,"smlawb (32x16+32, Q15 style) indep",mac,8,1.6e+08,0.200355,1.127,0.887312,900,1
+1792918925,pi-amp,"smlad (dual 16x16+32) indep",mac,16,1.6e+08,0.200346,1.12695,1.7747,900,1
+1792918925,pi-amp,"mla chain (latency)",latency,8,1.6e+08,0.200341,1.12692,0.887376,900,1
+1792918926,pi-amp,"smlad chain (latency)",latency,16,1.6e+08,0.200321,1.12681,1.77493,900,1
+1792918927,pi-amp,"vmla.f32 q x4 + smlad x4 interleaved",mixed,24,1.6e+08,0.467448,2.6294,1.14095,900,1
+1792918927,pi-amp,"vmla.i16 q x4 + smlad x4 interleaved",mixed,40,1.6e+08,0.289441,1.62811,3.07105,900,1
+1792918929,pi-amp,"vmla.f32 q x4 + vmla.i16 q x4 interleaved",mixed,48,1.6e+08,0.912696,5.13392,1.1687,900,1
+1792918931,pi-amp,"vmla.f32 q x4 + vadd.f32 q x4 interleaved",mixed,32,1.6e+08,1.09093,6.13646,0.651841,900,1
+1792918932,pi-amp,"vmla.f32 d + vld1.32 d (1:1)",mixed,8,1.6e+08,0.333975,1.87861,0.532309,900,1
+1792918933,pi-amp,"vmla.f32 q by-scalar x6 + vld1.32 q x2 (3:1)",mixed,24,1.6e+08,0.823765,4.63368,0.647434,900,1
+1792918935,pi-amp,"vmla.f32 q by-scalar x6 + 2 consecutive vld1.32 q",mixed,24,1.6e+08,0.734596,4.1321,0.726022,900,1
+1792918937,pi-amp,"vmla.f32 q x4 + vmul.f32 q x4 interleaved",mixed,32,1.6e+08,1.091,6.13689,0.651796,900,1
+1792918938,pi-amp,"vmla.f32 q by-scalar x4 + ARM add x4 (1:1)",mixed,16,1.6e+08,0.467712,2.63088,0.760202,900,1
+1792918939,pi-amp,"vmlal.s16 by-scalar x4 + ARM add x4 (1:1)",mixed,16,1.6e+08,0.289407,1.62791,1.22857,900,1
+1792918939,pi-amp,"vmlal.s16 by-scalar x6 + vld1.16 d x2 (3:1)",mixed,24,1.6e+08,0.333937,1.8784,1.59711,900,1
+1792918940,pi-amp,"vmla.i16 q x4 + vadd.i16 q x4 interleaved",mixed,64,1.6e+08,0.378555,2.12937,3.75698,900,1
+1792918941,pi-amp,"soft-float libgcc __aeabi_fmul+__aeabi_fadd",softfloat,1,8e+06,0.664178,74.72,0.0133833,900,1
+1792918941,pi-amp,"soft-float minimal emulation (no IEEE edge cases)",softfloat,1,8e+06,0.478605,53.8431,0.0185725,900,1
+1792918941,pi-amp,"hardware VFP mul+add, same C loop",softfloat,1,8e+06,0.0111291,1.25202,0.798707,900,1

@@ -1,0 +1,3 @@
+a2_fender_super_reverb.nam@full+pipe block=128 deadline=2666.7us p50=1785.7us p99=1921.9us max=2701.9us missed=7/675000 (0.001%) load=67.4% cpu=168.5% paced rt
+  wake p50=22.2us p99=30.1us max=194.7us missed_with_wake=7
+done: results/thermal_sustained_full_pipe3.csv

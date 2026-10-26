@@ -1,0 +1,6 @@
+# started on Sun Oct 25 03:17:07 2026
+
+3243508265,,cycles:u,3725222147,100.00,,
+21742093,,LLC-loads,3725222147,100.00,,
+399673,,LLC-load-misses,3725222147,100.00,1.84,of all LL-cache accesses
+369081,,L1-icache-load-misses,3725222147,100.00,,

@@ -1,0 +1,72 @@
+=== x_fsp_full_p2: ./build-x-fsplit/bench paced slim=full blocks='32 64' extra='--rt --cpu 3' NAM_A2_FSPLIT=8 NAM_A2_FSPLIT_THREADS=2 NAM_A2_FSPLIT_CPUS=2 NAM_A2_FSPLIT_PRIO=80
+sweep tag=x_fsp_full_p2 mode=paced extra='--rt --cpu 3' models=1 blocks='32 64' repeats=2
+a2_fender_super_reverb.nam@full block=32 deadline=666.7us p50=472.3us p99=1276.9us max=4791.7us missed=6803/104100 (6.535%) load=76.9% cpu=180.2% paced rt
+  wake p50=15.9us p99=2481039.1us max=2574754.0us missed_with_wake=24200
+a2_fender_super_reverb.nam@full block=32 deadline=666.7us p50=467.8us p99=622.7us max=2255.9us missed=663/104100 (0.637%) load=72.0% cpu=175.1% paced rt
+  wake p50=15.8us p99=23886.0us max=126639.2us missed_with_wake=2148
+a2_fender_super_reverb.nam@full block=64 deadline=1333.3us p50=904.8us p99=1075.7us max=1663.3us missed=17/52050 (0.033%) load=69.2% cpu=171.0% paced rt
+  wake p50=18.8us p99=29.2us max=1466.3us missed_with_wake=30
+a2_fender_super_reverb.nam@full block=64 deadline=1333.3us p50=908.1us p99=1077.0us max=1683.8us missed=8/52050 (0.015%) load=69.4% cpu=171.3% paced rt
+  wake p50=18.3us p99=23.6us max=429.6us missed_with_wake=11
+wrote results/summary_x_fsp_full_p2.csv
+=== x_fsp_full_p3: ./build-x-fsplit/bench paced slim=full blocks='24 48' extra='--rt --cpu 3' NAM_A2_FSPLIT=8 NAM_A2_FSPLIT_THREADS=3 NAM_A2_FSPLIT_CPUS=2,1 NAM_A2_FSPLIT_PRIO=80
+sweep tag=x_fsp_full_p3 mode=paced extra='--rt --cpu 3' models=1 blocks='24 48' repeats=2
+a2_fender_super_reverb.nam@full block=24 deadline=500.0us p50=252.7us p99=385.5us max=752.3us missed=74/138800 (0.053%) load=52.5% cpu=256.5% paced rt
+  wake p50=15.5us p99=19.4us max=643.4us missed_with_wake=108
+a2_fender_super_reverb.nam@full block=24 deadline=500.0us p50=255.2us p99=364.9us max=656.1us missed=83/138800 (0.060%) load=52.8% cpu=256.5% paced rt
+  wake p50=15.2us p99=21.3us max=375.2us missed_with_wake=124
+a2_fender_super_reverb.nam@full block=48 deadline=1000.0us p50=484.1us p99=613.4us max=1202.3us missed=4/69400 (0.006%) load=49.4% cpu=251.7% paced rt
+  wake p50=17.8us p99=26.5us max=2497.8us missed_with_wake=10
+a2_fender_super_reverb.nam@full block=48 deadline=1000.0us p50=485.5us p99=629.3us max=1179.3us missed=9/69400 (0.013%) load=49.8% cpu=252.1% paced rt
+  wake p50=17.7us p99=33.8us max=1656.9us missed_with_wake=15
+wrote results/summary_x_fsp_full_p3.csv
+=== x_fsp_full_p4: ./build-x-fsplit/bench paced slim=full blocks='16 32' extra='--rt --cpu 3' NAM_A2_FSPLIT=8 NAM_A2_FSPLIT_THREADS=4 NAM_A2_FSPLIT_CPUS=2,1,0 NAM_A2_FSPLIT_PRIO=80
+sweep tag=x_fsp_full_p4 mode=paced extra='--rt --cpu 3' models=1 blocks='16 32' repeats=2
+a2_fender_super_reverb.nam@full block=16 deadline=333.3us p50=140.4us p99=245.9us max=5194.7us missed=161/208200 (0.077%) load=44.2% cpu=349.5% paced rt
+  wake p50=14.4us p99=45.1us max=5311.0us missed_with_wake=550
+a2_fender_super_reverb.nam@full block=16 deadline=333.3us p50=141.4us p99=245.3us max=5672.1us missed=219/208200 (0.105%) load=44.9% cpu=350.1% paced rt
+  wake p50=14.2us p99=36.4us max=5389.6us missed_with_wake=762
+a2_fender_super_reverb.nam@full block=32 deadline=666.7us p50=256.7us p99=366.3us max=10047.0us missed=49/104100 (0.047%) load=39.7% cpu=342.8% paced rt
+  wake p50=16.2us p99=43.3us max=9475.1us missed_with_wake=178
+a2_fender_super_reverb.nam@full block=32 deadline=666.7us p50=259.8us p99=376.9us max=4822.0us missed=38/104100 (0.037%) load=40.3% cpu=343.7% paced rt
+  wake p50=17.4us p99=35.8us max=4215.0us missed_with_wake=133
+wrote results/summary_x_fsp_full_p4.csv
+=== x_fsp_lite_p2: ./build-x-fsplit/bench paced slim=lite blocks='8 16' extra='--rt --cpu 3' NAM_A2_FSPLIT=3 NAM_A2_FSPLIT_THREADS=2 NAM_A2_FSPLIT_CPUS=2 NAM_A2_FSPLIT_PRIO=80
+sweep tag=x_fsp_lite_p2 mode=paced extra='--rt --cpu 3' models=1 blocks='8 16' repeats=2
+a2_fender_super_reverb.nam@lite block=8 deadline=166.7us p50=42.6us p99=64.0us max=447.9us missed=57/416400 (0.014%) load=26.4% cpu=135.1% paced rt
+  wake p50=12.0us p99=18.5us max=1649.2us missed_with_wake=149
+a2_fender_super_reverb.nam@lite block=8 deadline=166.7us p50=42.7us p99=64.8us max=417.4us missed=86/416400 (0.021%) load=26.4% cpu=135.0% paced rt
+  wake p50=12.0us p99=17.2us max=372.4us missed_with_wake=183
+a2_fender_super_reverb.nam@lite block=16 deadline=333.3us p50=68.3us p99=106.4us max=318.6us missed=0/208200 (0.000%) load=21.3% cpu=125.8% paced rt
+  wake p50=12.3us p99=17.4us max=130.8us missed_with_wake=0
+a2_fender_super_reverb.nam@lite block=16 deadline=333.3us p50=68.5us p99=105.5us max=331.4us missed=0/208200 (0.000%) load=21.4% cpu=125.8% paced rt
+  wake p50=12.2us p99=22.3us max=1636.9us missed_with_wake=10
+wrote results/summary_x_fsp_lite_p2.csv
+done SET=fsplit_paced
+=== x_pipe_full_paced: ./build/bench paced slim=full blocks='32 64' extra='--rt --cpu 3 --pipeline 8' 
+sweep tag=x_pipe_full_paced mode=paced extra='--rt --cpu 3 --pipeline 8' models=1 blocks='32 64' repeats=2
+a2_fender_super_reverb.nam@full+pipe block=32 deadline=666.7us p50=451.6us p99=516.6us max=871.1us missed=25/104100 (0.024%) load=68.4% cpu=171.5% paced rt
+  wake p50=16.1us p99=24.6us max=341.3us missed_with_wake=46
+a2_fender_super_reverb.nam@full+pipe block=32 deadline=666.7us p50=450.7us p99=526.4us max=842.6us missed=101/104100 (0.097%) load=68.7% cpu=171.8% paced rt
+  wake p50=15.7us p99=22.7us max=577.9us missed_with_wake=144
+a2_fender_super_reverb.nam@full+pipe block=64 deadline=1333.3us p50=889.1us p99=971.7us max=1349.8us missed=1/52050 (0.002%) load=67.4% cpu=169.1% paced rt
+  wake p50=18.0us p99=29.6us max=134.5us missed_with_wake=1
+a2_fender_super_reverb.nam@full+pipe block=64 deadline=1333.3us p50=892.5us p99=986.6us max=1693.8us missed=1/52050 (0.002%) load=67.7% cpu=169.5% paced rt
+  wake p50=18.6us p99=26.9us max=422.7us missed_with_wake=3
+wrote results/summary_x_pipe_full_paced.csv
+=== x_lite_paced_small: ./build/bench paced slim=lite blocks='8 16 32' extra='--rt --cpu 3' 
+sweep tag=x_lite_paced_small mode=paced extra='--rt --cpu 3' models=1 blocks='8 16 32' repeats=2
+a2_fender_super_reverb.nam@lite block=8 deadline=166.7us p50=64.4us p99=87.3us max=258.6us missed=21/416400 (0.005%) load=39.6% cpu=48.0% paced rt
+  wake p50=12.0us p99=17.4us max=200.1us missed_with_wake=86
+a2_fender_super_reverb.nam@lite block=8 deadline=166.7us p50=64.4us p99=89.4us max=221.6us missed=9/416400 (0.002%) load=39.6% cpu=48.0% paced rt
+  wake p50=12.0us p99=16.7us max=207.1us missed_with_wake=42
+a2_fender_super_reverb.nam@lite block=16 deadline=333.3us p50=115.9us p99=152.8us max=490.3us missed=3/208200 (0.001%) load=35.7% cpu=40.0% paced rt
+  wake p50=12.0us p99=18.1us max=202.3us missed_with_wake=7
+a2_fender_super_reverb.nam@lite block=16 deadline=333.3us p50=115.5us p99=154.2us max=319.4us missed=0/208200 (0.000%) load=35.7% cpu=40.0% paced rt
+  wake p50=12.0us p99=15.0us max=130.1us missed_with_wake=0
+a2_fender_super_reverb.nam@lite block=32 deadline=666.7us p50=219.9us p99=261.3us max=429.5us missed=0/104100 (0.000%) load=33.5% cpu=35.7% paced rt
+  wake p50=12.4us p99=19.2us max=283.8us missed_with_wake=0
+a2_fender_super_reverb.nam@lite block=32 deadline=666.7us p50=220.1us p99=264.2us max=608.0us missed=0/104100 (0.000%) load=33.6% cpu=35.8% paced rt
+  wake p50=12.3us p99=18.3us max=1351.3us missed_with_wake=4
+wrote results/summary_x_lite_paced_small.csv
+done SET=pipe_paced

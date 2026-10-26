@@ -1,0 +1,252 @@
+-- The CXX compiler identification is GNU 14.2.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Found ALSA: /usr/lib/arm-linux-gnueabihf/libasound.so (found version "1.2.14")
+-- Configuring done (5.1s)
+-- Generating done (0.1s)
+-- Build files have been written to: /home/ctu/pi-neural-amp/build-gcc
+[  4%] Building CXX object CMakeFiles/neon_peak.dir/src/neon_peak.cpp.o
+[  8%] Building CXX object CMakeFiles/namcore.dir/nam_patched/NAM/activations.cpp.o
+[ 13%] Linking CXX executable neon_peak
+[ 13%] Built target neon_peak
+[ 17%] Building CXX object CMakeFiles/namcore.dir/nam_patched/NAM/container.cpp.o
+[ 21%] Building CXX object CMakeFiles/namcore.dir/nam_patched/NAM/conv1d.cpp.o
+[ 26%] Building CXX object CMakeFiles/namcore.dir/nam_patched/NAM/convnet.cpp.o
+[ 30%] Building CXX object CMakeFiles/namcore.dir/nam_patched/NAM/dsp.cpp.o
+[ 34%] Building CXX object CMakeFiles/namcore.dir/nam_patched/NAM/get_dsp.cpp.o
+[ 39%] Building CXX object CMakeFiles/namcore.dir/nam_patched/NAM/linear.cpp.o
+In file included from /usr/include/c++/14/regex:55,
+                 from /home/ctu/pi-neural-amp/build-gcc/nam_patched/NAM/get_dsp.cpp:5:
+/usr/include/c++/14/bits/stl_tree.h: In function ‘std::pair<std::_Rb_tree_node_base*, std::_Rb_tree_node_base*> std::_Rb_tree<_Key, _Val, _KeyOfValue, _Compare, _Alloc>::_M_get_insert_hint_unique_pos(const_iterator, const key_type&) [with _Key = std::__cxx11::basic_string<char>; _Val = std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> >; _KeyOfValue = std::_Select1st<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > >; _Compare = std::less<void>; _Alloc = std::allocator<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > >]’:
+/usr/include/c++/14/bits/stl_tree.h:2208:5: note: parameter passing for argument of type ‘std::_Rb_tree<std::__cxx11::basic_string<char>, std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> >, std::_Select1st<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > >, std::less<void>, std::allocator<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > > >::const_iterator’ changed in GCC 7.1
+ 2208 |     _Rb_tree<_Key, _Val, _KeyOfValue, _Compare, _Alloc>::
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/c++/14/bits/stl_tree.h: In member function ‘std::_Rb_tree<_Key, _Val, _KeyOfValue, _Compare, _Alloc>::iterator std::_Rb_tree<_Key, _Val, _KeyOfValue, _Compare, _Alloc>::_M_emplace_hint_unique(const_iterator, _Args&& ...) [with _Args = {std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, nlohmann::json_abi_v3_12_0::basic_json<std::map, std::vector, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, bool, long long int, long long unsigned int, double, std::allocator, nlohmann::json_abi_v3_12_0::adl_serializer, std::vector<unsigned char, std::allocator<unsigned char> >, void>}; _Key = std::__cxx11::basic_string<char>; _Val = std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> >; _KeyOfValue = std::_Select1st<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > >; _Compare = std::less<void>; _Alloc = std::allocator<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > >]’:
+/usr/include/c++/14/bits/stl_tree.h:2456:7: note: parameter passing for argument of type ‘std::_Rb_tree<std::__cxx11::basic_string<char>, std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> >, std::_Select1st<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > >, std::less<void>, std::allocator<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > > >::const_iterator’ changed in GCC 7.1
+ 2456 |       _Rb_tree<_Key, _Val, _KeyOfValue, _Compare, _Alloc>::
+      |       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/c++/14/regex:56:
+In member function ‘std::map<_Key, _Tp, _Compare, _Alloc>::iterator std::map<_Key, _Tp, _Compare, _Alloc>::emplace_hint(const_iterator, _Args&& ...) [with _Args = {std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, nlohmann::json_abi_v3_12_0::basic_json<std::map, std::vector, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, bool, long long int, long long unsigned int, double, std::allocator, nlohmann::json_abi_v3_12_0::adl_serializer, std::vector<unsigned char, std::allocator<unsigned char> >, void>}; _Key = std::__cxx11::basic_string<char>; _Tp = nlohmann::json_abi_v3_12_0::basic_json<>; _Compare = std::less<void>; _Alloc = std::allocator<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > >]’,
+    inlined from ‘std::pair<typename std::_Rb_tree<_Key, std::pair<const _Key, _Tp>, std::_Select1st<std::pair<const _Key, _Tp> >, _Compare, typename __gnu_cxx::__alloc_traits<_Allocator>::rebind<std::pair<const _Key, _Tp> >::other>::iterator, bool> std::map<_Key, _Tp, _Compare, _Alloc>::emplace(_Args&& ...) [with _Args = {std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, nlohmann::json_abi_v3_12_0::basic_json<std::map, std::vector, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, bool, long long int, long long unsigned int, double, std::allocator, nlohmann::json_abi_v3_12_0::adl_serializer, std::vector<unsigned char, std::allocator<unsigned char> >, void>}; _Key = std::__cxx11::basic_string<char>; _Tp = nlohmann::json_abi_v3_12_0::basic_json<>; _Compare = std::less<void>; _Alloc = std::allocator<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > >]’ at /usr/include/c++/14/bits/stl_map.h:601:22,
+    inlined from ‘nlohmann::json_abi_v3_12_0::basic_json<ObjectType, ArrayType, StringType, BooleanType, NumberIntegerType, NumberUnsignedType, NumberFloatType, AllocatorType, JSONSerializer, BinaryType, CustomBaseClass>::basic_json(initializer_list_t, bool, value_t) [with ObjectType = std::map; ArrayType = std::vector; StringType = std::__cxx11::basic_string<char>; BooleanType = bool; NumberIntegerType = long long int; NumberUnsignedType = long long unsigned int; NumberFloatType = double; AllocatorType = std::allocator; JSONSerializer = nlohmann::json_abi_v3_12_0::adl_serializer; BinaryType = std::vector<unsigned char>; CustomBaseClass = void]’ at /home/ctu/pi-neural-amp/external/NeuralAmpModelerCore/Dependencies/nlohmann/json.hpp:20964:47:
+/usr/include/c++/14/bits/stl_map.h:640:45: note: parameter passing for argument of type ‘std::map<std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<>, std::less<void>, std::allocator<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > > >::const_iterator’ {aka ‘std::_Rb_tree<std::__cxx11::basic_string<char>, std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> >, std::_Select1st<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > >, std::less<void>, std::allocator<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > > >::const_iterator’} changed in GCC 7.1
+  640 |           return _M_t._M_emplace_hint_unique(__pos,
+      |                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~
+  641 |                                              std::forward<_Args>(__args)...);
+      |                                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[ 43%] Building CXX object CMakeFiles/namcore.dir/nam_patched/NAM/lstm.cpp.o
+[ 47%] Building CXX object CMakeFiles/namcore.dir/nam_patched/NAM/nam_file.cpp.o
+In file included from /usr/include/c++/14/map:62,
+                 from /home/ctu/pi-neural-amp/external/NeuralAmpModelerCore/Dependencies/nlohmann/json.hpp:175,
+                 from /home/ctu/pi-neural-amp/build-gcc/nam_patched/NAM/nam_file.h:6,
+                 from /home/ctu/pi-neural-amp/build-gcc/nam_patched/NAM/nam_file.cpp:1:
+/usr/include/c++/14/bits/stl_tree.h: In function ‘std::_Rb_tree<_Key, _Val, _KeyOfValue, _Compare, _Alloc>::iterator std::_Rb_tree<_Key, _Val, _KeyOfValue, _Compare, _Alloc>::_M_emplace_hint_unique(const_iterator, _Args&& ...) [with _Args = {const std::piecewise_construct_t&, std::tuple<const std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&>, std::tuple<>}; _Key = std::__cxx11::basic_string<char>; _Val = std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> >; _KeyOfValue = std::_Select1st<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > >; _Compare = std::less<void>; _Alloc = std::allocator<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > >]’:
+/usr/include/c++/14/bits/stl_tree.h:2456:7: note: parameter passing for argument of type ‘std::_Rb_tree<std::__cxx11::basic_string<char>, std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> >, std::_Select1st<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > >, std::less<void>, std::allocator<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > > >::const_iterator’ changed in GCC 7.1
+ 2456 |       _Rb_tree<_Key, _Val, _KeyOfValue, _Compare, _Alloc>::
+      |       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[ 52%] Building CXX object CMakeFiles/namcore.dir/nam_patched/NAM/ring_buffer.cpp.o
+In file included from /usr/include/c++/14/map:63:
+In member function ‘std::map<_Key, _Tp, _Compare, _Alloc>::mapped_type& std::map<_Key, _Tp, _Compare, _Alloc>::operator[](const key_type&) [with _Key = std::__cxx11::basic_string<char>; _Tp = nlohmann::json_abi_v3_12_0::basic_json<>; _Compare = std::less<void>; _Alloc = std::allocator<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > >]’,
+    inlined from ‘bool nlohmann::json_abi_v3_12_0::detail::json_sax_dom_callback_parser<BasicJsonType, InputAdapterType>::key(string_t&) [with BasicJsonType = nlohmann::json_abi_v3_12_0::basic_json<>; InputAdapterType = nlohmann::json_abi_v3_12_0::detail::input_stream_adapter]’ at /home/ctu/pi-neural-amp/external/NeuralAmpModelerCore/Dependencies/nlohmann/json.hpp:9236:83:
+/usr/include/c++/14/bits/stl_map.h:513:44: note: parameter passing for argument of type ‘std::_Rb_tree<std::__cxx11::basic_string<char>, std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> >, std::_Select1st<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > >, std::less<void>, std::allocator<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > > >::const_iterator’ changed in GCC 7.1
+  513 |           __i = _M_t._M_emplace_hint_unique(__i, std::piecewise_construct,
+      |                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  514 |                                             std::tuple<const key_type&>(__k),
+      |                                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  515 |                                             std::tuple<>());
+      |                                             ~~~~~~~~~~~~~~~
+/usr/include/c++/14/bits/stl_map.h: In member function ‘std::map<_Key, _Tp, _Compare, _Alloc>::mapped_type& std::map<_Key, _Tp, _Compare, _Alloc>::operator[](const key_type&) [with _Key = std::__cxx11::basic_string<char>; _Tp = nlohmann::json_abi_v3_12_0::basic_json<>; _Compare = std::less<void>; _Alloc = std::allocator<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > >]’:
+/usr/include/c++/14/bits/stl_map.h:513:44: note: parameter passing for argument of type ‘std::_Rb_tree<std::__cxx11::basic_string<char>, std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> >, std::_Select1st<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > >, std::less<void>, std::allocator<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > > >::const_iterator’ changed in GCC 7.1
+  513 |           __i = _M_t._M_emplace_hint_unique(__i, std::piecewise_construct,
+      |                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  514 |                                             std::tuple<const key_type&>(__k),
+      |                                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  515 |                                             std::tuple<>());
+      |                                             ~~~~~~~~~~~~~~~
+In member function ‘std::map<_Key, _Tp, _Compare, _Alloc>::mapped_type& std::map<_Key, _Tp, _Compare, _Alloc>::operator[](const key_type&) [with _Key = std::__cxx11::basic_string<char>; _Tp = nlohmann::json_abi_v3_12_0::basic_json<>; _Compare = std::less<void>; _Alloc = std::allocator<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > >]’,
+    inlined from ‘bool nlohmann::json_abi_v3_12_0::detail::json_sax_dom_parser<BasicJsonType, InputAdapterType>::key(string_t&) [with BasicJsonType = nlohmann::json_abi_v3_12_0::basic_json<>; InputAdapterType = nlohmann::json_abi_v3_12_0::detail::input_stream_adapter]’ at /home/ctu/pi-neural-amp/external/NeuralAmpModelerCore/Dependencies/nlohmann/json.hpp:8914:79,
+    inlined from ‘bool nlohmann::json_abi_v3_12_0::detail::parser<BasicJsonType, InputAdapterType>::sax_parse_internal(SAX*) [with SAX = nlohmann::json_abi_v3_12_0::detail::json_sax_dom_parser<nlohmann::json_abi_v3_12_0::basic_json<>, nlohmann::json_abi_v3_12_0::detail::input_stream_adapter>; BasicJsonType = nlohmann::json_abi_v3_12_0::basic_json<>; InputAdapterType = nlohmann::json_abi_v3_12_0::detail::input_stream_adapter]’ at /home/ctu/pi-neural-amp/external/NeuralAmpModelerCore/Dependencies/nlohmann/json.hpp:13288:21:
+/usr/include/c++/14/bits/stl_map.h:513:44: note: parameter passing for argument of type ‘std::_Rb_tree<std::__cxx11::basic_string<char>, std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> >, std::_Select1st<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > >, std::less<void>, std::allocator<std::pair<const std::__cxx11::basic_string<char>, nlohmann::json_abi_v3_12_0::basic_json<> > > >::const_iterator’ changed in GCC 7.1
+  513 |           __i = _M_t._M_emplace_hint_unique(__i, std::piecewise_construct,
+      |                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  514 |                                             std::tuple<const key_type&>(__k),
+      |                                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  515 |                                             std::tuple<>());
+      |                                             ~~~~~~~~~~~~~~~
+[ 56%] Building CXX object CMakeFiles/namcore.dir/nam_patched/NAM/sequential.cpp.o
+[ 60%] Building CXX object CMakeFiles/namcore.dir/nam_patched/NAM/util.cpp.o
+[ 65%] Building CXX object CMakeFiles/namcore.dir/nam_patched/NAM/wav.cpp.o
+[ 69%] Building CXX object CMakeFiles/namcore.dir/nam_patched/NAM/wavenet/a2_fast.cpp.o
+[ 73%] Building CXX object CMakeFiles/namcore.dir/nam_patched/NAM/wavenet/model.cpp.o
+[ 78%] Building CXX object CMakeFiles/namcore.dir/nam_patched/NAM/wavenet/slimmable.cpp.o
+In file included from /usr/include/c++/14/algorithm:61,
+                 from /home/ctu/pi-neural-amp/external/NeuralAmpModelerCore/Dependencies/eigen/Eigen/Core:95,
+                 from /home/ctu/pi-neural-amp/external/NeuralAmpModelerCore/Dependencies/eigen/Eigen/Dense:1,
+                 from /home/ctu/pi-neural-amp/build-gcc/nam_patched/NAM/wavenet/../dsp.h:11,
+                 from /home/ctu/pi-neural-amp/build-gcc/nam_patched/NAM/wavenet/slimmable.h:22,
+                 from /home/ctu/pi-neural-amp/build-gcc/nam_patched/NAM/wavenet/slimmable.cpp:1:
+/usr/include/c++/14/bits/stl_algo.h: In function ‘constexpr void std::__introsort_loop(_RandomAccessIterator, _RandomAccessIterator, _Size, _Compare) [with _RandomAccessIterator = __gnu_cxx::__normal_iterator<double*, vector<double> >; _Size = int; _Compare = __gnu_cxx::__ops::_Iter_less_iter]’:
+/usr/include/c++/14/bits/stl_algo.h:1876:5: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<double*, std::vector<double> >’ changed in GCC 7.1
+ 1876 |     __introsort_loop(_RandomAccessIterator __first,
+      |     ^~~~~~~~~~~~~~~~
+/usr/include/c++/14/bits/stl_algo.h:1876:5: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<double*, std::vector<double> >’ changed in GCC 7.1
+/usr/include/c++/14/bits/stl_algo.h:1890:32: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<double*, std::vector<double> >’ changed in GCC 7.1
+ 1890 |           std::__introsort_loop(__cut, __last, __depth_limit, __comp);
+      |           ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In function ‘constexpr void std::__sort(_RandomAccessIterator, _RandomAccessIterator, _Compare) [with _RandomAccessIterator = __gnu_cxx::__normal_iterator<double*, vector<double> >; _Compare = __gnu_cxx::__ops::_Iter_less_iter]’,
+    inlined from ‘constexpr void std::sort(_RAIter, _RAIter) [with _RAIter = __gnu_cxx::__normal_iterator<double*, vector<double> >]’ at /usr/include/c++/14/bits/stl_algo.h:4772:18,
+    inlined from ‘std::vector<double> nam::slimmable_wavenet::{anonymous}::get_ratio_breakpoints(const std::vector<std::vector<int> >&)’ at /home/ctu/pi-neural-amp/build-gcc/nam_patched/NAM/wavenet/slimmable.cpp:118:12:
+/usr/include/c++/14/bits/stl_algo.h:1905:32: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<double*, std::vector<double> >’ changed in GCC 7.1
+ 1905 |           std::__introsort_loop(__first, __last,
+      |           ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~
+ 1906 |                                 std::__lg(__last - __first) * 2,
+      |                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 1907 |                                 __comp);
+      |                                 ~~~~~~~
+[ 82%] Building CXX object CMakeFiles/namcore.dir/external/NeuralAmpModelerCore/Dependencies/AudioDSPTools/dsp/wav.cpp.o
+[ 82%] Built target namcore
+[ 91%] Building CXX object CMakeFiles/bench.dir/src/bench.cpp.o
+[ 91%] Building CXX object CMakeFiles/live.dir/src/live.cpp.o
+In file included from /usr/include/c++/14/algorithm:61,
+                 from /home/ctu/pi-neural-amp/src/bench.cpp:20:
+/usr/include/c++/14/bits/stl_algo.h: In function ‘constexpr void std::__insertion_sort(_RandomAccessIterator, _RandomAccessIterator, _Compare) [with _RandomAccessIterator = __gnu_cxx::__normal_iterator<long long int*, vector<long long int> >; _Compare = __gnu_cxx::__ops::_Iter_less_iter]’:
+/usr/include/c++/14/bits/stl_algo.h:1770:5: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+ 1770 |     __insertion_sort(_RandomAccessIterator __first,
+      |     ^~~~~~~~~~~~~~~~
+/usr/include/c++/14/bits/stl_algo.h:1770:5: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+/usr/include/c++/14/bits/stl_algo.h: In function ‘constexpr void std::__introsort_loop(_RandomAccessIterator, _RandomAccessIterator, _Size, _Compare) [with _RandomAccessIterator = __gnu_cxx::__normal_iterator<long long int*, vector<long long int> >; _Size = int; _Compare = __gnu_cxx::__ops::_Iter_less_iter]’:
+/usr/include/c++/14/bits/stl_algo.h:1876:5: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+ 1876 |     __introsort_loop(_RandomAccessIterator __first,
+      |     ^~~~~~~~~~~~~~~~
+/usr/include/c++/14/bits/stl_algo.h:1876:5: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+/usr/include/c++/14/bits/stl_algo.h:1890:32: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+ 1890 |           std::__introsort_loop(__cut, __last, __depth_limit, __comp);
+      |           ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/c++/14/bits/stl_algo.h: In function ‘constexpr void std::__sort(_RandomAccessIterator, _RandomAccessIterator, _Compare) [with _RandomAccessIterator = __gnu_cxx::__normal_iterator<long long int*, vector<long long int> >; _Compare = __gnu_cxx::__ops::_Iter_less_iter]’:
+/usr/include/c++/14/bits/stl_algo.h:1900:5: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+ 1900 |     __sort(_RandomAccessIterator __first, _RandomAccessIterator __last,
+      |     ^~~~~~
+/usr/include/c++/14/bits/stl_algo.h:1900:5: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+/usr/include/c++/14/bits/stl_algo.h:1905:32: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+ 1905 |           std::__introsort_loop(__first, __last,
+      |           ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~
+ 1906 |                                 std::__lg(__last - __first) * 2,
+      |                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 1907 |                                 __comp);
+      |                                 ~~~~~~~
+In function ‘constexpr void std::__final_insertion_sort(_RandomAccessIterator, _RandomAccessIterator, _Compare) [with _RandomAccessIterator = __gnu_cxx::__normal_iterator<long long int*, vector<long long int> >; _Compare = __gnu_cxx::__ops::_Iter_less_iter]’,
+    inlined from ‘constexpr void std::__sort(_RandomAccessIterator, _RandomAccessIterator, _Compare) [with _RandomAccessIterator = __gnu_cxx::__normal_iterator<long long int*, vector<long long int> >; _Compare = __gnu_cxx::__ops::_Iter_less_iter]’ at /usr/include/c++/14/bits/stl_algo.h:1908:31:
+/usr/include/c++/14/bits/stl_algo.h:1817:32: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+ 1817 |           std::__insertion_sort(__first, __first + int(_S_threshold), __comp);
+      |           ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/c++/14/bits/stl_algo.h:1822:30: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+ 1822 |         std::__insertion_sort(__first, __last, __comp);
+      |         ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/c++/14/algorithm:61,
+                 from /home/ctu/pi-neural-amp/external/NeuralAmpModelerCore/Dependencies/eigen/Eigen/Core:95,
+                 from /home/ctu/pi-neural-amp/external/NeuralAmpModelerCore/Dependencies/eigen/Eigen/Dense:1,
+                 from /home/ctu/pi-neural-amp/build-gcc/nam_patched/NAM/dsp.h:11,
+                 from /home/ctu/pi-neural-amp/src/live.cpp:22:
+/usr/include/c++/14/bits/stl_algo.h: In function ‘constexpr void std::__insertion_sort(_RandomAccessIterator, _RandomAccessIterator, _Compare) [with _RandomAccessIterator = __gnu_cxx::__normal_iterator<long long int*, vector<long long int> >; _Compare = __gnu_cxx::__ops::_Iter_less_iter]’:
+/usr/include/c++/14/bits/stl_algo.h:1770:5: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+ 1770 |     __insertion_sort(_RandomAccessIterator __first,
+      |     ^~~~~~~~~~~~~~~~
+/usr/include/c++/14/bits/stl_algo.h:1770:5: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+/usr/include/c++/14/bits/stl_algo.h: In function ‘constexpr void std::__introsort_loop(_RandomAccessIterator, _RandomAccessIterator, _Size, _Compare) [with _RandomAccessIterator = __gnu_cxx::__normal_iterator<long long int*, vector<long long int> >; _Size = int; _Compare = __gnu_cxx::__ops::_Iter_less_iter]’:
+/usr/include/c++/14/bits/stl_algo.h:1876:5: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+ 1876 |     __introsort_loop(_RandomAccessIterator __first,
+      |     ^~~~~~~~~~~~~~~~
+/usr/include/c++/14/bits/stl_algo.h:1876:5: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+/usr/include/c++/14/bits/stl_algo.h:1890:32: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+ 1890 |           std::__introsort_loop(__cut, __last, __depth_limit, __comp);
+      |           ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/c++/14/bits/stl_algo.h: In function ‘constexpr void std::__sort(_RandomAccessIterator, _RandomAccessIterator, _Compare) [with _RandomAccessIterator = __gnu_cxx::__normal_iterator<long long int*, vector<long long int> >; _Compare = __gnu_cxx::__ops::_Iter_less_iter]’:
+/usr/include/c++/14/bits/stl_algo.h:1900:5: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+ 1900 |     __sort(_RandomAccessIterator __first, _RandomAccessIterator __last,
+      |     ^~~~~~
+/usr/include/c++/14/bits/stl_algo.h:1900:5: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+/usr/include/c++/14/bits/stl_algo.h:1905:32: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+ 1905 |           std::__introsort_loop(__first, __last,
+      |           ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~
+ 1906 |                                 std::__lg(__last - __first) * 2,
+      |                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 1907 |                                 __comp);
+      |                                 ~~~~~~~
+In function ‘constexpr void std::__final_insertion_sort(_RandomAccessIterator, _RandomAccessIterator, _Compare) [with _RandomAccessIterator = __gnu_cxx::__normal_iterator<long long int*, vector<long long int> >; _Compare = __gnu_cxx::__ops::_Iter_less_iter]’,
+    inlined from ‘constexpr void std::__sort(_RandomAccessIterator, _RandomAccessIterator, _Compare) [with _RandomAccessIterator = __gnu_cxx::__normal_iterator<long long int*, vector<long long int> >; _Compare = __gnu_cxx::__ops::_Iter_less_iter]’ at /usr/include/c++/14/bits/stl_algo.h:1908:31:
+/usr/include/c++/14/bits/stl_algo.h:1817:32: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+ 1817 |           std::__insertion_sort(__first, __first + int(_S_threshold), __comp);
+      |           ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/c++/14/bits/stl_algo.h:1822:30: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+ 1822 |         std::__insertion_sort(__first, __last, __comp);
+      |         ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/c++/14/vector:66,
+                 from /usr/include/c++/14/chrono:47,
+                 from /home/ctu/pi-neural-amp/src/bench.cpp:22:
+/usr/include/c++/14/bits/stl_vector.h: In constructor ‘constexpr std::vector<_Tp, _Alloc>::vector(_InputIterator, _InputIterator, const allocator_type&) [with _InputIterator = __gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >; <template-parameter-2-2> = void; _Tp = long long int; _Alloc = std::allocator<long long int>]’:
+/usr/include/c++/14/bits/stl_vector.h:707:9: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+  707 |         vector(_InputIterator __first, _InputIterator __last,
+      |         ^~~~~~
+/usr/include/c++/14/bits/stl_vector.h:707:9: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+In file included from /usr/include/c++/14/vector:66,
+                 from /home/ctu/pi-neural-amp/build-gcc/nam_patched/NAM/dsp.h:9:
+/usr/include/c++/14/bits/stl_vector.h: In constructor ‘constexpr std::vector<_Tp, _Alloc>::vector(_InputIterator, _InputIterator, const allocator_type&) [with _InputIterator = __gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >; <template-parameter-2-2> = void; _Tp = long long int; _Alloc = std::allocator<long long int>]’:
+/usr/include/c++/14/bits/stl_vector.h:707:9: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+  707 |         vector(_InputIterator __first, _InputIterator __last,
+      |         ^~~~~~
+/usr/include/c++/14/bits/stl_vector.h:707:9: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+/home/ctu/pi-neural-amp/src/bench.cpp: In function ‘int main(int, char**)’:
+/home/ctu/pi-neural-amp/src/bench.cpp:367:80: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+  367 |   std::vector<int64_t> measured(blockNs.begin() + a.warmupBlocks, blockNs.end());
+      |                                                                                ^
+In function ‘constexpr void std::sort(_RAIter, _RAIter) [with _RAIter = __gnu_cxx::__normal_iterator<long long int*, vector<long long int> >]’,
+    inlined from ‘int main(int, char**)’ at /home/ctu/pi-neural-amp/src/bench.cpp:377:12:
+/usr/include/c++/14/bits/stl_algo.h:4772:18: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+ 4772 |       std::__sort(__first, __last, __gnu_cxx::__ops::__iter_less_iter());
+      |       ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/ctu/pi-neural-amp/src/bench.cpp: In function ‘int main(int, char**)’:
+/home/ctu/pi-neural-amp/src/bench.cpp:379:80: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+  379 |   std::vector<int64_t> wakeSorted(wakeNs.begin() + a.warmupBlocks, wakeNs.end());
+      |                                                                                ^
+In function ‘constexpr void std::sort(_RAIter, _RAIter) [with _RAIter = __gnu_cxx::__normal_iterator<long long int*, vector<long long int> >]’,
+    inlined from ‘int main(int, char**)’ at /home/ctu/pi-neural-amp/src/bench.cpp:380:12:
+/usr/include/c++/14/bits/stl_algo.h:4772:18: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+ 4772 |       std::__sort(__first, __last, __gnu_cxx::__ops::__iter_less_iter());
+      |       ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/ctu/pi-neural-amp/src/live.cpp: In function ‘int main(int, char**)’:
+/home/ctu/pi-neural-amp/src/live.cpp:479:77: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+  479 |   std::vector<int64_t> proc(procNs.begin() + skip, procNs.begin() + nPeriods);
+      |                                                                             ^
+In function ‘constexpr void std::sort(_RAIter, _RAIter) [with _RAIter = __gnu_cxx::__normal_iterator<long long int*, vector<long long int> >]’,
+    inlined from ‘int main(int, char**)’ at /home/ctu/pi-neural-amp/src/live.cpp:484:12:
+/usr/include/c++/14/bits/stl_algo.h:4772:18: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+ 4772 |       std::__sort(__first, __last, __gnu_cxx::__ops::__iter_less_iter());
+      |       ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In function ‘constexpr void std::sort(_RAIter, _RAIter) [with _RAIter = __gnu_cxx::__normal_iterator<long long int*, vector<long long int> >]’,
+    inlined from ‘int main(int, char**)’ at /home/ctu/pi-neural-amp/src/live.cpp:485:12:
+/usr/include/c++/14/bits/stl_algo.h:4772:18: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+ 4772 |       std::__sort(__first, __last, __gnu_cxx::__ops::__iter_less_iter());
+      |       ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/ctu/pi-neural-amp/src/live.cpp: In function ‘int main(int, char**)’:
+/home/ctu/pi-neural-amp/src/live.cpp:528:82: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+  528 |     std::vector<int64_t> rts(roundTrips.begin(), roundTrips.begin() + nRoundTrips);
+      |                                                                                  ^
+In function ‘constexpr void std::sort(_RAIter, _RAIter) [with _RAIter = __gnu_cxx::__normal_iterator<long long int*, vector<long long int> >]’,
+    inlined from ‘int main(int, char**)’ at /home/ctu/pi-neural-amp/src/live.cpp:529:14:
+/usr/include/c++/14/bits/stl_algo.h:4772:18: note: parameter passing for argument of type ‘__gnu_cxx::__normal_iterator<long long int*, std::vector<long long int> >’ changed in GCC 7.1
+ 4772 |       std::__sort(__first, __last, __gnu_cxx::__ops::__iter_less_iter());
+      |       ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[ 95%] Linking CXX executable bench
+[ 95%] Built target bench
+[100%] Linking CXX executable live
+[100%] Built target live
+
+real	12m23.659s
+user	24m5.837s
+sys	0m34.191s

@@ -1,0 +1,6 @@
+# started on Sat Oct 24 18:46:55 2026
+
+7461086704,,cycles:u,8406949764,100.00,,
+6627488548,,instructions:u,8406949764,100.00,0.89,insn per cycle
+178183726,,branches:u,8406949764,100.00,,
+5901464,,branch-misses:u,8406949764,100.00,3.31,of all branches

@@ -1,0 +1,5 @@
+model,block,deadline_ms,p99_us_lite_paced,p99_us_lite_paced_rt,max_us_lite_paced,max_us_lite_paced_rt,missed_lite_paced,missed_lite_paced_rt,wake_p99_us_lite_paced,wake_p99_us_lite_paced_rt,missed_with_wake_lite_paced,missed_with_wake_lite_paced_rt,p99_change_pct_lite_paced_rt,wake_p99_change_pct_lite_paced_rt
+a2_fender_super_reverb.nam@lite,16,0.33333300000000005,179.427,172.99450000000002,390.416,342.812,4,2,73.1605,16.088,72,4,-3.58502343571479,-78.00999173051032
+a2_fender_super_reverb.nam@lite,32,0.666667,304.401,299.219,473.438,563.75,0,0,76.144,24.1015,0,0,-1.7023597162952868,-68.34747320865728
+a2_fender_super_reverb.nam@lite,64,1.33333,562.4475,555.4685,962.083,810.051,0,0,77.7835,19.0395,0,0,-1.2408269216238035,-75.52244370592734
+a2_fender_super_reverb.nam@lite,128,2.66667,1061.9499999999998,1077.865,1278.49,1237.4,0,0,79.69399999999999,20.38,0,0,1.498658128913809,-74.4271839787186

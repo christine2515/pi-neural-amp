@@ -1,0 +1,6 @@
+# started on Sat Oct 24 20:14:42 2026
+
+24167405374,,cycles:u,27333256076,100.00,,
+134550558,,LLC-loads,27333256076,100.00,,
+8232738,,LLC-load-misses,27333256076,100.00,6.12,of all LL-cache accesses
+775885,,L1-icache-load-misses,27333256076,100.00,,

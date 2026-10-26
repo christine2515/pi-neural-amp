@@ -1,0 +1,14 @@
+unix_time,host,variant,lanes,instructions,seconds,cycles_per_instr,ops_per_cycle,mhz_assumed
+1792898256,pi-amp,"vmla.f32 q by-scalar indep",4,1.6e+08,0.735021,4.13449,0.96747,900
+1792898257,pi-amp,"vmla.f32 q indep",4,1.6e+08,0.734596,4.1321,0.96803,900
+1792898258,pi-amp,"vmla.f32 d indep",2,1.6e+08,0.378486,2.12898,0.939415,900
+1792898259,pi-amp,"vfma.f32 q indep",4,1.6e+08,0.735209,4.13555,0.967223,900
+1792898260,pi-amp,"vfma.f32 d indep",2,1.6e+08,0.378579,2.12951,0.939184,900
+1792898261,pi-amp,"vmul.f32 q indep",4,1.6e+08,0.735792,4.13883,0.966457,900
+1792898263,pi-amp,"vadd.f32 q indep",4,1.6e+08,0.734606,4.13216,0.968017,900
+1792898263,pi-amp,"vmla.f32 s (VFP scalar) indep",1,1.6e+08,0.200458,1.12757,0.88686,900
+1792898264,pi-amp,"vfma.f32 s (VFP scalar) indep",1,1.6e+08,0.200361,1.12703,0.887288,900
+1792898266,pi-amp,"vmla.f32 q chain (latency)",4,1.6e+08,0.890687,5.01012,0.798385,900
+1792898267,pi-amp,"vmla.f32 d chain (latency)",2,1.6e+08,0.890529,5.00922,0.399263,900
+1792898269,pi-amp,"vfma.f32 q chain (latency)",4,1.6e+08,0.890416,5.00859,0.798628,900
+1792898271,pi-amp,"vadd.f32 q chain (latency)",4,1.6e+08,0.734646,4.13238,0.967964,900

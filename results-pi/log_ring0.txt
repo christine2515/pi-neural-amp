@@ -1,0 +1,5 @@
+sweep tag=ring0 mode=burst extra='' models=1 blocks='128' repeats=3
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=993.2us p99=1066.9us max=1405.1us missed=0/26025 (0.000%) load=37.5% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=987.4us p99=1068.9us max=1223.3us missed=0/26025 (0.000%) load=37.3% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=990.7us p99=1059.4us max=1229.8us missed=0/26025 (0.000%) load=37.4% cpu=100.0%
+wrote results/summary_ring0.csv

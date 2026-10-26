@@ -1,0 +1,14 @@
+sweep tag=pipe_full_paced mode=paced extra='--pipeline 8' models=1 blocks='64 128 256' repeats=2
+a2_fender_super_reverb.nam@full+pipe block=64 deadline=1333.3us p50=903.2us p99=992.8us max=1465.1us missed=5/52050 (0.010%) load=68.5% cpu=171.0% paced
+  wake p50=78.4us p99=114.8us max=530.2us missed_with_wake=12
+a2_fender_super_reverb.nam@full+pipe block=64 deadline=1333.3us p50=908.2us p99=1009.1us max=1685.3us missed=9/52050 (0.017%) load=68.8% cpu=171.1% paced
+  wake p50=78.0us p99=84.8us max=510.0us missed_with_wake=21
+a2_fender_super_reverb.nam@full+pipe block=128 deadline=2666.7us p50=1793.6us p99=1904.1us max=2432.7us missed=0/26025 (0.000%) load=67.8% cpu=169.3% paced
+  wake p50=86.1us p99=104.1us max=215.6us missed_with_wake=0
+a2_fender_super_reverb.nam@full+pipe block=128 deadline=2666.7us p50=1797.4us p99=1923.2us max=2372.4us missed=0/26025 (0.000%) load=67.9% cpu=169.4% paced
+  wake p50=86.0us p99=95.8us max=345.7us missed_with_wake=0
+a2_fender_super_reverb.nam@full+pipe block=256 deadline=5333.3us p50=3605.3us p99=3782.8us max=4732.6us missed=0/13012 (0.000%) load=67.8% cpu=168.8% paced
+  wake p50=96.8us p99=152.8us max=173.2us missed_with_wake=0
+a2_fender_super_reverb.nam@full+pipe block=256 deadline=5333.3us p50=3615.4us p99=3774.6us max=4331.8us missed=0/13012 (0.000%) load=67.9% cpu=168.9% paced
+  wake p50=97.2us p99=126.6us max=153.2us missed_with_wake=0
+wrote results/summary_pipe_full_paced.csv

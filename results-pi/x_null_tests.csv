@@ -1,0 +1,7 @@
+unix_time,label,reference,candidate,samples,shift,max_abs_diff,max_abs_diff_dbfs,rms_diff,residual_db_rel_ref
+1792922750,x_fsplit2_slim0.25,nhead_0.25.wav,fsplit2_0.25.wav,483200,0,0.000e+00,-inf,0.000e+00,-inf
+1792922766,x_fsplit3_slim0.25,nhead_0.25.wav,fsplit3_0.25.wav,483200,0,0.000e+00,-inf,0.000e+00,-inf
+1792922784,x_fsplit4_slim0.25,nhead_0.25.wav,fsplit4_0.25.wav,483200,0,0.000e+00,-inf,0.000e+00,-inf
+1792922821,x_fsplit2_slim1,nhead_1.wav,fsplit2_1.wav,483200,0,0.000e+00,-inf,0.000e+00,-inf
+1792923038,x_fsplit3_slim1,nhead_1.wav,fsplit3_1.wav,483200,0,0.000e+00,-inf,0.000e+00,-inf
+1792923150,x_fsplit4_slim1,nhead_1.wav,fsplit4_1.wav,483200,0,0.000e+00,-inf,0.000e+00,-inf

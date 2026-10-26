@@ -1,0 +1,5 @@
+sweep tag=ctl_sampler mode=burst extra='' models=1 blocks='128' repeats=3
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=1026.9us p99=1386.2us max=1776.7us missed=0/26025 (0.000%) load=39.8% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=1026.8us p99=1380.4us max=1686.7us missed=0/26025 (0.000%) load=39.8% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=1033.5us p99=1400.1us max=1718.6us missed=0/26025 (0.000%) load=40.0% cpu=100.0%
+wrote results/summary_ctl_sampler.csv

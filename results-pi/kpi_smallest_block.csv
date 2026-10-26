@@ -1,0 +1,65 @@
+tag,model,smallest_glitch_free_block,latency_ms,p99_us_at_that_block,smallest_block_incl_wake,blocks_tested
+a2fm,a2_fender_super_reverb.nam@full,none,,,none,128
+a2fm,a2_fender_super_reverb.nam@lite,128,2.66667,1195.0,128,128
+baseline,a2_fender_super_reverb.nam@full,none,,,none,128
+baseline,a2_fender_super_reverb.nam@lite,128,2.66667,1091.61,128,128
+baseline_ondemand,a2_fender_super_reverb.nam@full,none,,,none,128
+baseline_ondemand,a2_fender_super_reverb.nam@lite,none,,,none,128
+clang,a2_fender_super_reverb.nam@full,none,,,none,128
+clang,a2_fender_super_reverb.nam@lite,128,2.66667,1383.59,128,128
+clangref,a2_fender_super_reverb.nam@full+pipe,none,,,none,128
+clangref,a2_fender_super_reverb.nam@lite,128,2.66667,932.186,128,128
+ctl_nologger,a2_fender_super_reverb.nam@full+pipe,128,2.66667,1885.0,none,128
+ctl_pylogger,a2_fender_super_reverb.nam@full+pipe,128,2.66667,1906.93,128,128
+ctl_sampler,a2_fender_super_reverb.nam@lite,128,2.66667,1386.2,128,128
+gcc,a2_fender_super_reverb.nam@full,none,,,none,128
+gcc,a2_fender_super_reverb.nam@lite,128,2.66667,1257.45,128,128
+gcc14,a2_fender_super_reverb.nam@full+pipe,none,,,none,128
+gcc14,a2_fender_super_reverb.nam@lite,128,2.66667,885.468,128,128
+head,a2_fender_super_reverb.nam@full+pipe,none,,,none,128
+head,a2_fender_super_reverb.nam@lite,128,2.66667,917.031,128,128
+lazy,a2_fender_super_reverb.nam@full,none,,,none,128
+lite_paced,a2_fender_super_reverb.nam@lite,32,0.666667,304.401,32,16 32 64 128
+lite_paced_rt,a2_fender_super_reverb.nam@lite,32,0.666667,299.219,32,16 32 64 128
+neon,a2_fender_super_reverb.nam@full,none,,,none,128
+neon,a2_fender_super_reverb.nam@lite,128,2.66667,920.989,128,128
+perf_a2fm,a2_fender_super_reverb.nam@lite,128,2.66667,1211.98,128,128
+perf_base,a2_fender_super_reverb.nam@full,none,,,none,128
+perf_base,a2_fender_super_reverb.nam@lite,128,2.66667,1085.8600000000001,128,128
+perf_lazy,a2_fender_super_reverb.nam@full,none,,,none,128
+perf_neon,a2_fender_super_reverb.nam@full,none,,,none,128
+perf_neon,a2_fender_super_reverb.nam@lite,128,2.66667,930.4680000000001,128,128
+pipe_full,a2_fender_super_reverb.nam@full+pipe,none,,,none,128
+pipe_full_paced,a2_fender_super_reverb.nam@full+pipe,128,2.66667,1913.67,128,64 128 256
+pipe_full_paced_rt,a2_fender_super_reverb.nam@full+pipe,256,5.33333,3752.505,256,64 128 256
+pipe_lite_paced_rt,a2_fender_super_reverb.nam@lite+pipe,16,0.33333300000000005,81.8235,16,16 32
+pipe_split,a2_fender_super_reverb.nam@full+pipe11,128,2.66667,2212.11,128,128
+pipe_split,a2_fender_super_reverb.nam@full+pipe12,none,,,none,128
+pipe_split,a2_fender_super_reverb.nam@full+pipe13,none,,,none,128
+pipe_split,a2_fender_super_reverb.nam@full+pipe14,none,,,none,128
+pipe_split,a2_fender_super_reverb.nam@full+pipe15,none,,,none,128
+ring0,a2_fender_super_reverb.nam@lite,128,2.66667,1066.93,128,128
+ring0_full,a2_fender_super_reverb.nam@full,none,,,none,128
+vmla,a2_fender_super_reverb.nam@full,none,,,none,128
+vmla,a2_fender_super_reverb.nam@lite,128,2.66667,925.312,128,128
+x_fs_full_p2,a2_fender_super_reverb.nam@full,none,,,none,8 16 32 64 128
+x_fs_full_p3,a2_fender_super_reverb.nam@full,96,2.0,1087.965,96,12 16 24 32 48 96
+x_fs_full_p4,a2_fender_super_reverb.nam@full,none,,,none,16 32 64 128
+x_fs_lite_p2,a2_fender_super_reverb.nam@lite,32,0.666667,158.69799999999998,32,8 16 32 64
+x_fs_lite_p4,a2_fender_super_reverb.nam@lite,none,,,none,16 32
+x_fs_off,a2_fender_super_reverb.nam@full,none,,,none,16 128
+x_fs_off,a2_fender_super_reverb.nam@lite,128,2.66667,914.3225,128,16 128
+x_fsp_full_p2,a2_fender_super_reverb.nam@full,none,,,none,32 64
+x_fsp_full_p3,a2_fender_super_reverb.nam@full,none,,,none,24 48
+x_fsp_full_p4,a2_fender_super_reverb.nam@full,none,,,none,16 32
+x_fsp_lite_p2,a2_fender_super_reverb.nam@lite,16,0.33333300000000005,105.964,none,8 16
+x_lite_paced_small,a2_fender_super_reverb.nam@lite,32,0.666667,262.7345,none,8 16 32
+x_perf_n128,a2_fender_super_reverb.nam@full,none,,,none,128
+x_perf_n128,a2_fender_super_reverb.nam@lite,128,2.66667,935.052,128,128
+x_perf_n8,a2_fender_super_reverb.nam@full,none,,,none,8
+x_perf_n8,a2_fender_super_reverb.nam@lite,none,,,none,8
+x_pipe_full_paced,a2_fender_super_reverb.nam@full+pipe,none,,,none,32 64
+x_render,a2_fender_super_reverb.nam@full,none,,,none,32
+x_render,a2_fender_super_reverb.nam@lite,none,,,none,32
+x_smallN_burst,a2_fender_super_reverb.nam@full,none,,,none,8 16 32 64 128
+x_smallN_burst,a2_fender_super_reverb.nam@lite,32,0.666667,258.17650000000003,32,8 16 32 64 128

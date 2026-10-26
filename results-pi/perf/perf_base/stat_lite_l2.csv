@@ -1,0 +1,6 @@
+# started on Sat Oct 24 18:47:12 2026
+
+7465319858,,cycles:u,8407124971,100.00,,
+49891728,,LLC-loads,8407124971,100.00,,
+1064955,,LLC-load-misses,8407124971,100.00,2.13,of all LL-cache accesses
+219245,,L1-icache-load-misses,8407124971,100.00,,

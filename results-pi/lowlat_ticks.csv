@@ -1,0 +1,10 @@
+unix_time,file,blocks,median_us,deadline_us,factor,spikes,spikes_per_s,top_spacing_s,top_spacing_count,mean_excess_us,missed
+1792920182,results-pi/blocks/x_smallN_burst/a2_fender_super_reverb@lite__8__r1.csv,180000,61.09,166.667,1.5,1376,121.21,0.009,1048,41.96,17
+1792920182,results-pi/blocks/x_smallN_burst/a2_fender_super_reverb@lite__8__r2.csv,180000,61.41,166.667,1.5,1696,147.79,0.009,888,61.89,60
+1792920182,results-pi/blocks/x_smallN_burst/a2_fender_super_reverb@lite__16__r1.csv,90000,112.34,333.333,1.5,98,9.4,0.06,3,104.58,6
+1792920182,results-pi/blocks/x_smallN_burst/a2_fender_super_reverb@lite__16__r2.csv,90000,112.66,333.333,1.5,219,20.87,0.01,17,109.05,16
+1792920182,results-pi/blocks/x_smallN_burst/a2_fender_super_reverb@lite__32__r1.csv,45000,216.15,666.667,1.5,31,3.12,0.047,2,178.16,0
+1792922760,results-pi/blocks/x_fsp_full_p3/a2_fender_super_reverb@full__24__r1.csv,138800,252.71,500.0,1.5,1638,23.6,0.05,1141,154.48,74
+1792922760,results-pi/blocks/x_fsp_full_p4/a2_fender_super_reverb@full__16__r1.csv,208200,140.36,333.333,1.5,3303,47.59,0.025,2388,129.06,161
+1792922760,results-pi/blocks/x_fsp_lite_p2/a2_fender_super_reverb@lite__16__r1.csv,208200,68.33,333.333,1.5,3362,48.44,0.025,2182,41.68,0
+1792922761,results-pi/blocks/x_lite_paced_small/a2_fender_super_reverb@lite__16__r1.csv,208200,115.89,333.333,1.5,134,1.93,0.8,25,87.66,3

@@ -1,0 +1,5 @@
+sweep tag=pipe_full mode=burst extra='--pipeline 8' models=1 blocks='128' repeats=3
+a2_fender_super_reverb.nam@full+pipe block=128 deadline=2666.7us p50=1792.6us p99=1928.1us max=2380.9us missed=0/26025 (0.000%) load=67.6% cpu=199.9%
+a2_fender_super_reverb.nam@full+pipe block=128 deadline=2666.7us p50=1784.3us p99=1918.1us max=2273.1us missed=0/26025 (0.000%) load=67.4% cpu=200.0%
+a2_fender_super_reverb.nam@full+pipe block=128 deadline=2666.7us p50=1785.1us p99=1942.0us max=2734.2us missed=1/26025 (0.004%) load=67.4% cpu=200.0%
+wrote results/summary_pipe_full.csv

@@ -1,0 +1,5 @@
+tag,model,smallest_glitch_free_block,latency_ms,p99_us_at_that_block,smallest_block_incl_wake,blocks_tested
+clang,a2_fender_super_reverb.nam@full,none,,,none,128
+clang,a2_fender_super_reverb.nam@lite,128,2.66667,1383.59,128,128
+gcc,a2_fender_super_reverb.nam@full,none,,,none,128
+gcc,a2_fender_super_reverb.nam@lite,128,2.66667,1257.45,128,128

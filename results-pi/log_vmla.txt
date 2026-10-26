@@ -1,0 +1,8 @@
+sweep tag=vmla mode=burst extra='' models=1 blocks='128' repeats=3
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=850.7us p99=925.2us max=1524.8us missed=0/26025 (0.000%) load=32.2% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=856.1us p99=932.5us max=1217.5us missed=0/26025 (0.000%) load=32.4% cpu=100.0%
+a2_fender_super_reverb.nam@lite block=128 deadline=2666.7us p50=855.4us p99=925.3us max=1271.1us missed=0/26025 (0.000%) load=32.3% cpu=100.0%
+a2_fender_super_reverb.nam@full block=128 deadline=2666.7us p50=3529.3us p99=3749.2us max=4540.8us missed=26025/26025 (100.000%) load=132.9% cpu=100.0%
+a2_fender_super_reverb.nam@full block=128 deadline=2666.7us p50=3517.7us p99=3723.8us max=4781.0us missed=26025/26025 (100.000%) load=132.4% cpu=100.0%
+a2_fender_super_reverb.nam@full block=128 deadline=2666.7us p50=3526.7us p99=3739.2us max=4517.1us missed=26025/26025 (100.000%) load=132.8% cpu=100.0%
+wrote results/summary_vmla.csv

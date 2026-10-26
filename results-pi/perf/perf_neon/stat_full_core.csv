@@ -1,0 +1,6 @@
+# started on Sat Oct 24 20:13:47 2026
+
+24242440393,,cycles:u,27413444821,100.00,,
+6554769170,,instructions:u,27413444821,100.00,0.27,insn per cycle
+95840601,,branches:u,27413444821,100.00,,
+4102883,,branch-misses:u,27413444821,100.00,4.28,of all branches

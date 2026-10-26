@@ -1,0 +1,6 @@
+# started on Sat Oct 24 19:06:57 2026
+
+8255922305,,cycles:u,9294284041,100.00,,
+2954664174,,instructions:u,9294284041,100.00,0.36,insn per cycle
+64842898,,branches:u,9294284041,100.00,,
+4671332,,branch-misses:u,9294284041,100.00,7.20,of all branches

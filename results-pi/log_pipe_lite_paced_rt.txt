@@ -1,0 +1,10 @@
+sweep tag=pipe_lite_paced_rt mode=paced extra='--pipeline 3 --rt --cpu 3' models=1 blocks='16 32' repeats=2
+a2_fender_super_reverb.nam@lite+pipe block=16 deadline=333.3us p50=60.8us p99=82.0us max=279.5us missed=0/208200 (0.000%) load=18.7% cpu=123.0% paced rt
+  wake p50=12.1us p99=17.7us max=204.2us missed_with_wake=0
+a2_fender_super_reverb.nam@lite+pipe block=16 deadline=333.3us p50=60.1us p99=81.6us max=309.9us missed=0/208200 (0.000%) load=18.6% cpu=122.9% paced rt
+  wake p50=12.1us p99=17.8us max=181.5us missed_with_wake=0
+a2_fender_super_reverb.nam@lite+pipe block=32 deadline=666.7us p50=115.3us p99=140.5us max=416.6us missed=0/104100 (0.000%) load=17.6% cpu=119.9% paced rt
+  wake p50=12.2us p99=13.9us max=57.5us missed_with_wake=0
+a2_fender_super_reverb.nam@lite+pipe block=32 deadline=666.7us p50=115.6us p99=139.9us max=313.2us missed=0/104100 (0.000%) load=17.6% cpu=119.9% paced rt
+  wake p50=12.5us p99=17.0us max=89.8us missed_with_wake=0
+wrote results/summary_pipe_lite_paced_rt.csv

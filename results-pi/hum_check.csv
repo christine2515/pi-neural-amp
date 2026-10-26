@@ -1,0 +1,10 @@
+unix_time,label,channel,file,seconds,rms_dbfs,hum60_dbfs,hum120_dbfs,hum180_dbfs,hum_series_dbfs,buzz_2k4_2k9_dbfs,hf_2k_8k_dbfs
+1792964782,A_vol0,1,A_vol0.wav,10.0,-79.3,-92.5,-102.5,-101.0,-91.3,-93.7,-85.7
+1792964826,B_unplugged,1,B_unplugged.wav,10.0,-79.3,-92.4,-101.7,-100.4,-91.0,-94.0,-85.7
+1792964880,E_unplugged_gain_min,1,E_unplugged_gain_min.wav,10.0,-79.3,-92.4,-101.8,-100.5,-91.1,-94.1,-85.6
+1792966109,B2_unplugged,1,B2_unplugged.wav,10.0,-89.7,-108.9,-119.0,-118.3,-107.7,-109.6,-98.8
+1792966165,E2_unplugged_gain_min,1,E2_unplugged_gain_min.wav,10.0,-101.1,-119.6,-129.6,-130.3,-118.6,-120.4,-109.8
+1792966295,A2_vol0,1,A2_vol0.wav,10.0,-105.1,-126.9,-139.0,-138.5,-126.2,-122.1,-111.3
+1792966454,C2_volpartial_touch,1,C2_volpartial_touch.wav,10.0,-66.8,-70.6,-81.9,-79.3,-69.5,-92.4,-85.2
+1792966508,C2b_volpartial_notouch,1,C2b_volpartial_notouch.wav,10.0,-66.2,-70.0,-79.9,-78.2,-68.7,-90.2,-84.8
+1792966585,D_moved,1,D_moved.wav,10.0,-69.9,-77.2,-86.3,-85.6,-75.8,-94.7,-89.1

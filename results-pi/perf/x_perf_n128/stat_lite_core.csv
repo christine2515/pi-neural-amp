@@ -1,0 +1,6 @@
+# started on Sun Oct 25 03:16:59 2026
+
+3241104292,,cycles:u,3723753969,100.00,,
+1031388443,,instructions:u,3723753969,100.00,0.32,insn per cycle
+41364685,,branches:u,3723753969,100.00,,
+2526617,,branch-misses:u,3723753969,100.00,6.11,of all branches
