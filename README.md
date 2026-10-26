@@ -92,8 +92,8 @@ Reproduce: [RUNBOOK.md](RUNBOOK.md). Best build: `-DBENCH_A2_RING_MODE=0` + patc
 **Neural Guitar Amp on Raspberry Pi 2 | C++, ARM NEON, Linux real-time, perf**
 - Built a real-time neural guitar amp on a Raspberry Pi 2 (900 MHz ARM, C++) that went from unable to keep
   up at any buffer size to playing live with 2 ms of in-device buffer latency (1.3 ms for the lite model) and
-  1 underrun in 10 minutes, using hand-written NEON kernels and lock-free multi-core execution (3.8× faster
-  per core-pair); output verified identical by null test.
+  1 underrun in 10 minutes, using hand-written NEON kernels and lock-free multi-core execution (full model
+  3.8× faster on two cores); output verified identical by null test.
 
 More variants and a fact-check table: [docs/resume-bullet.md](docs/resume-bullet.md).
 
@@ -101,7 +101,7 @@ More variants and a fact-check table: [docs/resume-bullet.md](docs/resume-bullet
 
 - **Round-trip latency** (needs an RCA → ¼" loopback cable; `scripts/latency_test.sh` is ready).
 - **Core isolation** (`isolcpus`, IRQ affinity) and a **PREEMPT_RT** kernel for the last rare overruns.
-- **Frame split** now runs live (Full 2.0 ms, above); next: a `--fsplit` flag in `live`/`bench` instead of env vars, and core isolation to go below 48 frames.
+- **Frame split** now runs live (Full 2.0 ms, above); run it with `live --fsplit 8` (build `build-armhf-nfs`); next: core isolation to go below 48 frames.
 - **I2S converters** instead of USB: the only route to round trips under ~2 ms (estimate).
 - Status of every optimization (adopted, rejected, pending, needs Christine): [docs/step2/optimizations-summary.md](docs/step2/optimizations-summary.md).
 - **Natural-language tone selection** (long-term: describe a sound, a decider such as TypeSafe's Jev picks a NAM model, `live` hot-swaps it): design in [docs/step2/natural-language-tone-selection.md](docs/step2/natural-language-tone-selection.md).

@@ -73,6 +73,9 @@ struct Args
   std::string pipeline;    // A2 two-core pipeline spec ("8", "3", "all"); needs the a2_pipeline patch
   int pipelineCpu = -1;    // worker core; default 2 when --cpu 3
   int pipelineSplit = 0;
+  std::string fsplit;          // frame split spec ("8", "3", "all"); needs the a2_frame_split patch
+  int fsplitThreads = 3;
+  std::string fsplitCpus = "2,1";
 };
 
 void Usage()
@@ -99,7 +102,9 @@ void Usage()
                "  --mmap               ALSA mmap access (snd_pcm_mmap_readi/writei) instead of read/write\n"
                "  --pipeline C         two-core A2 pipeline (8 = Full, 3 = Lite); adds one period of latency\n"
                "  --pipeline-cpu N     worker core (default 2 with --cpu 3)\n"
-               "  --pipeline-split L   first layer run by the worker\n";
+               "  --pipeline-split L   first layer run by the worker\n"
+               "  --fsplit C           A2 frame split across cores for channel count C (8 = Full, 3 = Lite), no added\n"
+               "                       latency; --fsplit-threads N (default 3), --fsplit-cpus LIST (default 2,1)\n";
 }
 
 bool ParseArgs(int argc, char** argv, Args& a)
@@ -165,6 +170,12 @@ bool ParseArgs(int argc, char** argv, Args& a)
       a.pipelineCpu = std::atoi(next("--pipeline-cpu"));
     else if (s == "--pipeline-split")
       a.pipelineSplit = std::atoi(next("--pipeline-split"));
+    else if (s == "--fsplit")
+      a.fsplit = next("--fsplit");
+    else if (s == "--fsplit-threads")
+      a.fsplitThreads = std::atoi(next("--fsplit-threads"));
+    else if (s == "--fsplit-cpus")
+      a.fsplitCpus = next("--fsplit-cpus");
     else if (s == "--periods-out")
       a.periodsOut = next("--periods-out");
     else if (s == "-h" || s == "--help")
@@ -360,6 +371,9 @@ int main(int argc, char** argv)
     if (!ConfigureA2Pipeline(a.pipeline, a.pipelineCpu, a.pipelineSplit, a.rt ? a.rtPrio : 0, BENCH_BUILD_FLAGS))
       return 2;
   }
+  if (!a.fsplit.empty()
+      && !ConfigureA2FrameSplit(a.fsplit, a.fsplitThreads, a.fsplitCpus, a.rt ? a.rtPrio : 0, BENCH_BUILD_FLAGS))
+    return 2;
   std::signal(SIGINT, OnSignal);
   std::signal(SIGTERM, OnSignal);
 
@@ -394,6 +408,8 @@ int main(int argc, char** argv)
       modelName += "@" + SlimVariantName(slimmable->GetSlimmableSizeBreakpoints(), a.slim);
     }
     const auto at = modelName.rfind('@');
+    if (PipelineApplies(a.fsplit, at == std::string::npos ? std::string() : modelName.substr(at + 1)))
+      modelName += "+fs" + std::to_string(a.fsplitThreads);
     if (PipelineApplies(a.pipeline, at == std::string::npos ? std::string() : modelName.substr(at + 1)))
       modelName += "+pipe" + (a.pipelineSplit > 0 ? std::to_string(a.pipelineSplit) : std::string());
   }

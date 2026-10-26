@@ -237,6 +237,24 @@ inline bool ConfigureA2Pipeline(const std::string& spec, int cpu, int split, int
   return true;
 }
 
+// Configure A2 frame split (patches/a2_frame_split.patch): each layer's frames split across `threads`
+// cores with a barrier per layer, no added latency. Worker cores come from `cpus` ("2,1"); the calling
+// thread is the first share. Call before nam::get_dsp. Returns false if the build lacks the patch.
+inline bool ConfigureA2FrameSplit(const std::string& spec, int threads, const std::string& cpus, int prio,
+                                  const char* buildFlags)
+{
+  if (std::string(buildFlags).find("a2_frame_split") == std::string::npos)
+  {
+    std::cerr << "--fsplit needs a build with patches/a2_frame_split.patch\n";
+    return false;
+  }
+  setenv("NAM_A2_FSPLIT", spec.c_str(), 1);
+  setenv("NAM_A2_FSPLIT_THREADS", std::to_string(threads).c_str(), 1);
+  setenv("NAM_A2_FSPLIT_CPUS", cpus.c_str(), 1);
+  setenv("NAM_A2_FSPLIT_PRIO", std::to_string(prio).c_str(), 1);
+  return true;
+}
+
 // Whether a pipeline spec applies to an A2 submodel ("lite" = 3 channels, "full" = 8). Used for labels.
 inline bool PipelineApplies(const std::string& spec, const std::string& variant)
 {

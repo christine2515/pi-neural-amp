@@ -105,7 +105,7 @@ passages 0.0 dB change (offline, same recording). The gated take had 2 underruns
 | Option | Why not (measured unless marked) |
 |---|---|
 | ALSA mmap (`--mmap`) | No gain for Lite; pipelined Full at 2 periods fails (688 / 15,000 underruns at 64; every period at 128). 3 periods is clean (`lsw_*_mmap`) |
-| Frame split (`a2_frame_split`) | **Now measured live** (build `nfs`, env `NAM_A2_FSPLIT=8 NAM_A2_FSPLIT_THREADS=3 NAM_A2_FSPLIT_CPUS=2,1 NAM_A2_FSPLIT_PRIO=80`): Full at **48 × 2 = 2.0 ms**, **1 underrun in 600,000 periods over 10 min** (`live10_full_fsplit3_48x2`), p99 769 µs / 1,000 deadline, 3 cores (CPU 267%), 49 °C. Replaces the pipeline as the lowest-latency Full setting. `live` still has no `--fsplit` flag (env vars only) |
+| Frame split (`a2_frame_split`) | **Now measured live** (build `nfs`, `live --fsplit 8` (3 threads on cores 3/2/1; same as env `NAM_A2_FSPLIT=8 …`)): Full at **48 × 2 = 2.0 ms**, **1 underrun in 600,000 periods over 10 min** (`live10_full_fsplit3_48x2`), p99 769 µs / 1,000 deadline, 3 cores (CPU 267%), 49 °C. Replaces the pipeline as the lowest-latency Full setting. Command: `./build-nfs/live --device hw:USB --in-channel 1 --model models/a2_fender_super_reverb.nam --slim 1 --fsplit 8 --period 48 --periods 2 --rt --cpu 3 --gate -50` |
 | `isolcpus` / `nohz_full` / IRQ affinity | Needs sudo + reboot (🧑); `nohz_full` also needs a kernel rebuild (`CONFIG_NO_HZ_FULL` off in stock `rpi-v7`) |
 | PREEMPT_RT | Needs a kernel build (🧑). `--rt` already gives 16–24 µs wake-up p99 (`rt_comparison.csv`) |
 | GPU (VideoCore IV) | No compute path with the `vc4-kms-v3d` overlay; `/dev/vcio` is root-only (beyond-fpu §5) |

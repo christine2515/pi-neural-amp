@@ -126,7 +126,7 @@ If the Scarlett drops out or crackles, power it from a powered USB hub instead o
 
     arecord -l                     # find the card name; usually "USB" -> DEVICE=hw:USB
     ./build/live --device hw:USB --in-channel 1 --model models/a2_fender_super_reverb.nam --slim 0.25 --period 32 --periods 2 --rt --cpu 3 --gate -50 --duration 60   # Lite
-    NAM_A2_FSPLIT=8 NAM_A2_FSPLIT_THREADS=3 NAM_A2_FSPLIT_CPUS=2,1 NAM_A2_FSPLIT_PRIO=80 ./build-nfs/live --device hw:USB --in-channel 1 --model models/a2_fender_super_reverb.nam --slim 1 --period 48 --periods 2 --rt --cpu 3 --gate -50 --duration 60   # Full, frame split
+    ./build-nfs/live --device hw:USB --in-channel 1 --model models/a2_fender_super_reverb.nam --slim 1 --fsplit 8 --period 48 --periods 2 --rt --cpu 3 --gate -50 --duration 60   # Full, frame split
 
 Current recommended settings and their measured numbers: docs/step2/state-of-the-union.md.
 
