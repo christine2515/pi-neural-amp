@@ -105,6 +105,7 @@ More variants and a fact-check table: [docs/resume-bullet.md](docs/resume-bullet
   943 µs per block on 4 cores offline, bit-identical; not yet run live ([docs/low-latency-plan.md](docs/low-latency-plan.md)).
 - **I2S converters** instead of USB: the only route to round trips under ~2 ms (estimate).
 - Status of every optimization (adopted, rejected, pending, needs Christine): [docs/optimizations-summary.md](docs/optimizations-summary.md).
+- **Natural-language tone selection** (long-term: describe a sound, a decider such as TypeSafe's Jev picks a NAM model, `live` hot-swaps it): design in [docs/natural-language-tone-selection.md](docs/natural-language-tone-selection.md).
 
 ## Repo map
 

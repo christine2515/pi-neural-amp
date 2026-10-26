@@ -717,3 +717,23 @@ Offline on the same recording, playing passages were unchanged (0.0 dB). The gat
   event at plug-in, which is sticky since boot).
 - PSS 12.8 MB in this run: `live`'s preallocated per-period timing arrays grow with `--duration`
   (450,000 × 16 bytes ≈ 7 MB here). The model's own footprint is the 5.8 MB measured in the 15 s run.
+
+### Live: period alignment and frame split (2026-10-25)
+
+**Period-arrival jitter explained** (`live10_periods.csv`): at 64-frame periods (1.333 ms), periods arrive
+in a 1.5 / 1.5 / 1.0 ms pattern (62% / 28%), summing to exactly 4.000 ms per 3 periods. The USB driver
+delivers in 0.5 ms chunks. Periods that are multiples of 0.5 ms (24/48/96 frames) arrive evenly:
+read-to-read p1/p99 489/514 µs at 24 × 3, 984/1,018 at 48 × 2 (`quant__*` rows). Lite 24 × 3 (1.5 ms) is clean;
+24 × 2 underruns every other period (the USB floor at 2 periods).
+
+**2 s kernel event:** the `raspberrypi_hwmon` mailbox poll (every 2.08 s, `x_mbox_events.csv`) is ruled out:
+2 of 22 polls fell near a spike, the same as chance. Spikes cluster at 10 ms (100 Hz tick). Identifying the
+2.000 s event needs a kernel trace (docs/sudo-session.md step 2). USB IRQs land on all 4 cores
+(~2,000/s per core); moving them is step 1 there.
+
+**Frame split live** (`patches/a2_frame_split.patch`, 3 threads on cores 3/2/1, `NAM_A2_FSPLIT*` env, no
+pipeline, build `nfs`): 20 s runs with 0 underruns at 48 × 2 (2.0 ms), 32 × 3 (2.0 ms), 64 × 2 and 48 × 3.
+**10 minutes at 48 × 2 (`live10_full_fsplit3_48x2`): 1 underrun in 600,000 periods**; p50/p99/max
+595/769/1,772 µs (deadline 1,000); 226 periods over deadline were absorbed by the buffer; 43.3 → 49.2 °C,
+no new throttling. **Full's in-device buffering drops from 4.0 ms (pipeline, 64 × 2) to 2.0 ms** at the same
+underrun rate, using 3 cores (CPU 267%).
