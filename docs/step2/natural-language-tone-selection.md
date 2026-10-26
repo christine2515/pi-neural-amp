@@ -5,16 +5,18 @@
 > next to them. External facts link to their source. **Estimate** marks anything not measured; vendor
 > numbers are labeled as vendor claims.
 
+Hardware, model store, display and the Jev call path: [connected-amp-design.md](connected-amp-design.md).
+
 ## 0. Summary
 
-- **What "jev" is.** Most likely **Jev, TypeSafe AI's "decision model"**, released in early access in
+- **The decider is Jev, TypeSafe AI's "decision model"**, released in early access in
   September 2026 ([InfoQ](https://www.infoq.com/news/2026/10/typesafe-ai-jev-released/),
   [typesafe.ai](https://typesafe.ai/)). It does not generate text. It answers typed questions (pick one
   of up to 255 options, score on a scale of up to 10 levels, true/false) with probabilities and a
   confidence value. It takes text only, is served only as a hosted API, and is billed per input token.
   That fits "pick one NAM model from a catalog" closely, and its output can only be a catalog entry.
-  It cannot run on the Pi. Details and caveats are in section 2. The doc keeps the decider
-  **pluggable** in case Christine meant something else.
+  It cannot run on the Pi. Details and caveats are in section 2. The decider sits behind an
+  interface so the offline fallbacks (rules, CLAP) and a Claude fallback plug in the same way.
 - **v1 recommendation:** build an offline catalog on the Mac by rendering the same DI through every
   model, then measuring loudness, brightness and gain, and computing a **LAION-CLAP music** audio
   embedding. At query time, the request text is embedded (in the browser or on the Mac), and the
@@ -64,9 +66,9 @@ never misses a deadline while this happens.
 
 ---
 
-## 2. What "jev" is
+## 2. Jev
 
-### 2.1 Best match: TypeSafe AI's Jev (credible, with caveats)
+### 2.1 TypeSafe AI's Jev
 
 - **What it is.** TypeSafe calls Jev a "System One" model: software sends a *state* (text or JSON)
   and a set of typed questions, and Jev returns typed answers with calibrated probabilities and a
@@ -100,22 +102,11 @@ never misses a deadline while this happens.
   calls to make each compositional decision for a MIDI generator, and it accepts plain-English
   revision requests. That is the same pattern proposed here: Jev chooses, code acts.
 
-Search results also surfaced audio-flavored derivatives ("Qwen-Audio-Jev" on
-[arXiv](https://arxiv.org/html/2610.21614v1), "AudioJev" on
-[Hugging Face](https://huggingface.co/mocomoco-inc/AudioJev-AudioDecisionModel), and a "Jev-Omni"
-mode on an unofficial playground). **I did not verify these.** TypeSafe's own docs list no audio
-model.
+### 2.2 The decider interface
 
-### 2.2 Why this is probably what Christine meant
-
-Jev was released the month before this doc and is described as a model that *decides*. Christine's
-note says jev should "decide which nam model to use". Jev's Choice question with ≤255 described
-options maps one-to-one onto "pick a NAM model from the catalog". I found no audio or music model
-named Jev, and no common acronym that fits better.
-
-### 2.3 If it's something else: keep the decider pluggable
-
-Everything below talks to an interface rather than to Jev directly:
+Jev's Choice question with ≤255 described options maps one-to-one onto "pick a NAM model from the
+catalog". The offline fallbacks and the Claude fallback need the same shape, so everything below
+talks to one interface rather than to Jev directly:
 
 ```python
 class Decider(Protocol):
@@ -132,7 +123,7 @@ class Decision:
 ```
 
 The planned implementations are `RulesDecider` (Pi), `EmbeddingDecider` (text or CLAP), `JevDecider`
-and `ClaudeDecider`. If "jev" turns out to be another model, it becomes one more class.
+and `ClaudeDecider`.
 
 ---
 
@@ -648,8 +639,6 @@ The design questions ("why not run the LLM on the Pi?", "how do you guarantee a 
 | **Loudness jumps** | Trim from measured LUFS, ramped over the fade; clamp; user loudness edits |
 | **CLAP may not separate fine amp differences** | Descriptor rules carry coarse traits; the eval decides whether CLAP earns its place |
 | **Vendor risk** (Jev is early access; pricing and models can change) | Pluggable `Decider`; pin `jev-1.14.0` once τ is tuned (Pydantic AI docs recommend pinning, [link](https://pydantic.dev/docs/ai/models/typesafe/)) |
-| **"jev" meant something else** | Ask Christine; the design doesn't depend on it |
-
 ---
 
 ## Sources

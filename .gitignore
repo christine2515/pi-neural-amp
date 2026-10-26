@@ -19,3 +19,6 @@ results-pi/*.data*
 results-pi/*_periods.csv
 results-pi/recordings/
 results-pi/hum/
+
+# API keys for tonectl (never commit)
+secrets.env

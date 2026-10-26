@@ -93,7 +93,7 @@ Reproduce: [RUNBOOK.md](RUNBOOK.md). Best build: `-DBENCH_A2_RING_MODE=0` + patc
 - **Frame split** now runs live (Full 2.0 ms, above); run it with `live --fsplit 8` (build `build-armhf-nfs`); next: core isolation to go below 48 frames.
 - **I2S converters** instead of USB: the only route to round trips under ~2 ms (estimate).
 - Status of every optimization (adopted, rejected, pending, needs Christine): [docs/step2/optimizations-summary.md](docs/step2/optimizations-summary.md).
-- **Natural-language tone selection** (long-term: describe a sound, a decider such as TypeSafe's Jev picks a NAM model, `live` hot-swaps it): design in [docs/step2/natural-language-tone-selection.md](docs/step2/natural-language-tone-selection.md).
+- **Natural-language tone selection** (long-term: describe a sound, TypeSafe's Jev picks a NAM model, `live` hot-swaps it): design in [docs/step2/natural-language-tone-selection.md](docs/step2/natural-language-tone-selection.md); WiFi, model store, display and Jev wiring in [docs/step2/connected-amp-design.md](docs/step2/connected-amp-design.md).
 
 ## Repo map
 
