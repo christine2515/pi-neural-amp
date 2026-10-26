@@ -18,7 +18,7 @@ dilated-convolution WaveNet. Its full-size version needs **11,776 multiply-adds 
 |---|---|---|---|
 | **Full model, time per 128-sample block** (p50 / p99) | 6,696 / 6,925 µs, **251%** of the real-time budget | **1,767 / 1,910 µs, 66%** (**3.79× faster**) | `kpi_by_block.csv` (tags `baseline`, `head`) |
 | **Lite model, time per block** (p50 / p99) | 1,032 / 1,092 µs | **843 / 917 µs** | `kpi_by_block.csv` |
-| **Smallest live buffer, Full** (Scarlett Solo, `--rt`) | can't run live at any size | **64 × 2 periods + 64-sample pipeline = 4.0 ms in-device buffering**; **1 underrun in 450,000 periods (10 min)** | `live_summary.csv` (`lsw_full_pipe`, `live10_full_pipe_64x2`) |
+| **Smallest live buffer, Full** (Scarlett Solo, `--rt`) | can't run live at any size | **48 × 2 periods = 2.0 ms in-device buffering** with frame split on 3 cores; **1 underrun in 600,000 periods (10 min)**. (Two-core pipeline: 4.0 ms, 1 in 450,000.) | `live_summary.csv` (`live10_full_fsplit3_48x2`, `live10_full_pipe_64x2`) |
 | **Smallest live buffer, Lite** | — | **32 × 2 = 1.33 ms**, 0 underruns | `live_summary.csv` (`lsw_lite`) |
 | **30-minute sustained, Full** (paced, `--rt`) | — | p99 1,922 µs every minute; 7 overruns in 675,000 blocks (each ≤ 35 µs over); 44 °C peak, never throttled | `summary_sustained_full_pipe3.csv`, `sustained_per_minute_full_pipe3.csv` |
 | **Memory** (live, whole process) | — | Lite **5.6 MB**, Full pipelined **5.8 MB** PSS (5,582 / 5,842 kB) | `live_summary.csv` (`first_live`, `memfix_build-nhead2`) |
@@ -91,9 +91,9 @@ Reproduce: [RUNBOOK.md](RUNBOOK.md). Best build: `-DBENCH_A2_RING_MODE=0` + patc
 
 **Neural Guitar Amp on Raspberry Pi 2 | C++, ARM NEON, Linux real-time, perf**
 - Built a real-time neural guitar amp on a Raspberry Pi 2 (900 MHz ARM, C++) that went from unable to keep
-  up at any buffer size to playing live with 4 ms of in-device buffer latency (1.3 ms for the lite model),
-  using hand-written NEON kernels and a lock-free 2-core pipeline (3.8× faster inference, 5.8 MB);
-  output verified identical by null test.
+  up at any buffer size to playing live with 2 ms of in-device buffer latency (1.3 ms for the lite model) and
+  1 underrun in 10 minutes, using hand-written NEON kernels and lock-free multi-core execution (3.8× faster
+  per core-pair); output verified identical by null test.
 
 More variants and a fact-check table: [docs/resume-bullet.md](docs/resume-bullet.md).
 
@@ -101,8 +101,7 @@ More variants and a fact-check table: [docs/resume-bullet.md](docs/resume-bullet
 
 - **Round-trip latency** (needs an RCA → ¼" loopback cable; `scripts/latency_test.sh` is ready).
 - **Core isolation** (`isolcpus`, IRQ affinity) and a **PREEMPT_RT** kernel for the last rare overruns.
-- **Frame split** (`patches/a2_frame_split.patch`): same speed as the pipeline without its extra block,
-  943 µs per block on 4 cores offline, bit-identical; not yet run live ([docs/low-latency-plan.md](docs/low-latency-plan.md)).
+- **Frame split** now runs live (Full 2.0 ms, above); next: a `--fsplit` flag in `live`/`bench` instead of env vars, and core isolation to go below 48 frames.
 - **I2S converters** instead of USB: the only route to round trips under ~2 ms (estimate).
 - Status of every optimization (adopted, rejected, pending, needs Christine): [docs/step2/optimizations-summary.md](docs/step2/optimizations-summary.md).
 - **Natural-language tone selection** (long-term: describe a sound, a decider such as TypeSafe's Jev picks a NAM model, `live` hot-swaps it): design in [docs/step2/natural-language-tone-selection.md](docs/step2/natural-language-tone-selection.md).

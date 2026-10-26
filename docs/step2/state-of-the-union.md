@@ -105,7 +105,7 @@ passages 0.0 dB change (offline, same recording). The gated take had 2 underruns
 | Option | Why not (measured unless marked) |
 |---|---|
 | ALSA mmap (`--mmap`) | No gain for Lite; pipelined Full at 2 periods fails (688 / 15,000 underruns at 64; every period at 128). 3 periods is clean (`lsw_*_mmap`) |
-| Frame split (`a2_frame_split`) | Offline only: same speed as the pipeline without its extra block (Full 1,770 µs at 128 on 2 cores, 943 µs on 4; 2.0 ms digital delay at 48 samples on 3 cores, 13 / 138,800 late). `live` has no `--fsplit` flag yet |
+| Frame split (`a2_frame_split`) | **Now measured live** (build `nfs`, env `NAM_A2_FSPLIT=8 NAM_A2_FSPLIT_THREADS=3 NAM_A2_FSPLIT_CPUS=2,1 NAM_A2_FSPLIT_PRIO=80`): Full at **48 × 2 = 2.0 ms**, **1 underrun in 600,000 periods over 10 min** (`live10_full_fsplit3_48x2`), p99 769 µs / 1,000 deadline, 3 cores (CPU 267%), 49 °C. Replaces the pipeline as the lowest-latency Full setting. `live` still has no `--fsplit` flag (env vars only) |
 | `isolcpus` / `nohz_full` / IRQ affinity | Needs sudo + reboot (🧑); `nohz_full` also needs a kernel rebuild (`CONFIG_NO_HZ_FULL` off in stock `rpi-v7`) |
 | PREEMPT_RT | Needs a kernel build (🧑). `--rt` already gives 16–24 µs wake-up p99 (`rt_comparison.csv`) |
 | GPU (VideoCore IV) | No compute path with the `vc4-kms-v3d` overlay; `/dev/vcio` is root-only (beyond-fpu §5) |
@@ -135,7 +135,7 @@ passages 0.0 dB change (offline, same recording). The gated take had 2 underruns
 
 | Goal | Lite | Full | Measured support |
 |---|---|---|---|
-| **Lower latency** | `--period 32 --periods 2` → 1.33 ms | `--period 64 --periods 2 --pipeline 8` → 4.0 ms | Lite 0 / 45,000; Full 1 / 450,000 in 10 min. These are the live floors today; going lower needs frame split in `live` and, below ~2 ms, isolated cores (low-latency-plan §8) |
+| **Lower latency** | `--period 32 --periods 2` → 1.33 ms (or 24 × 3 → 1.5 ms, even 0.5 ms wake-ups) | **frame split, 3 cores: `--period 48 --periods 2` → 2.0 ms** (no pipeline block) | Lite 0 / 45,000; Full 1 / 600,000 in 10 min (`live10_full_fsplit3_48x2`). Going lower needs isolated cores (docs/sudo-session.md) |
 | **Maximum robustness** | `--period 64 --periods 2` → 2.67 ms (or 32 × 3 → 2.0 ms) | `--period 64 --periods 3 --pipeline 8` → 5.33 ms (4.0 ms ALSA + 1.33 ms pipeline) | Lite 64 × 2: 0 / 22,500 and 0 / 15,000; 32 × 3: 0 / 30,000. Full 64 × 3: 0 / 15,000 (`lsw_full_pipe`) and 0 / 11,250 (`memfix_build-nhead2`). Full 128 × 2/3 also 0 (8 ms+), and 30 min paced offline at 128 had 7 marginal overruns, 44.4 °C peak (`sustained_full_pipe3`) |
 
 The robust settings have only 15–30 s runs behind them; a 30-minute live run of either is still open

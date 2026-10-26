@@ -440,7 +440,7 @@ is enough), and the index in `emb` is the row.
 
 ### 5.2 Memory: how many models can stay preloaded
 
-- **Measured:** `live` PSS at 128 × 2 is bypass **4.4 MB**, Lite **5.5 MB** (experiment-report, Live
+- **Measured:** `live` PSS at 128 × 2 is bypass **4.4 MB**, Lite **5.6 MB** (experiment-report, Live
   table). So one loaded A2 container, with both submodels, buffers and parse leftovers, costs about
   **1.1 MB** of PSS.
 - **From weight counts:** Full 12,146 floats = **48.6 KB**, Lite 1,871 = 7.5 KB (learning/02). Most of

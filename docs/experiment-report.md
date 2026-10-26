@@ -608,8 +608,8 @@ All runs: `--rt --cpu 3`, 2 periods, 30 s (`results-pi/live_summary.csv`, labels
 | Config | ALSA buffer | Underruns | Model time p50 / p99 / max | CPU | PSS |
 |---|---|---|---|---|---|
 | bypass, 128 × 2 | 5.33 ms | 0 / 11,250 periods | 0.8 / 1.4 / 2.2 µs | 2% | 4.4 MB |
-| Lite, 128 × 2 | 5.33 ms | 0 / 11,250 | 893 / 988 / 1,134 µs | 36% | 5.5 MB |
-| Full pipelined, 128 × 2 | 5.33 ms + 128-sample pipeline | 0 / 11,250 | 1,875 / 2,062 / 2,314 µs | 174% | 13.5 MB* |
+| Lite, 128 × 2 | 5.33 ms | 0 / 11,250 | 893 / 988 / 1,134 µs | 36% | 5.6 MB |
+| Full pipelined, 128 × 2 | 5.33 ms + 128-sample pipeline | 0 / 11,250 | 1,875 / 2,062 / 2,314 µs | 174% | 13.8 MB* |
 | bypass, 32 × 2 | 1.33 ms | 0 / 45,000 | — | 8% | |
 | **bypass, 16 × 2** | 0.67 ms | **45,082 / 90,000** | — | | |
 | Lite, 64 × 2 | 2.67 ms | 0 / 22,500 | 448 / 509 / 681 µs | 38% | |
@@ -684,9 +684,9 @@ other period).
 ### Live memory: the pipeline worker's stack (`patches/a2_pipeline_stack.patch`)
 
 Under `--rt`, `mlockall(MCL_FUTURE)` locked the pipeline worker's default 8 MB thread stack into RAM, so
-pipelined Full showed 13.8 MB PSS vs Lite's 5.5 MB. The patch starts the worker as a pthread with a 256 KB
+pipelined Full showed 13.8 MB PSS vs Lite's 5.6 MB (5,582 kB). The patch starts the worker as a pthread with a 256 KB
 stack. Full pipelined, 64 × 3, 15 s each (`memfix_*`): **PSS 13,778 → 5,842 kB**, p99 1,071 vs 1,079 µs,
-0 underruns both. Adopted (build `nhead2`, deployed to the Pi's `build/`). **Live memory: Lite 5.5 MB,
+0 underruns both. Adopted (build `nhead2`, deployed to the Pi's `build/`). **Live memory: Lite 5.6 MB,
 Full pipelined 5.8 MB** (whole process: model, ALSA buffers, libraries).
 
 ### Live noise gate (`live --gate`, `src/common.h` NoiseGate)
@@ -713,7 +713,7 @@ Offline on the same recording, playing passages were unchanged (0.0 dB). The gat
 - Model time p50 967 µs, p99 1,084 µs, max 1,709 µs (deadline 1,333 µs). **43 periods (0.01%) took
   longer than one period**, mostly by < 100 µs. The 2-period buffer absorbed all but one of them, so a
   compute overrun isn't automatically an audible glitch.
-- Temperature 37.9 → 46.5 °C; no new throttling (the start reading's 0x50000 is the earlier under-voltage
+- Temperature ~39.5 → 46.5 °C (the log's 37.9 °C minimum is from before the run window); no new throttling (the start reading's 0x50000 is the earlier under-voltage
   event at plug-in, which is sticky since boot).
 - PSS 12.8 MB in this run: `live`'s preallocated per-period timing arrays grow with `--duration`
   (450,000 × 16 bytes ≈ 7 MB here). The model's own footprint is the 5.8 MB measured in the 15 s run.
@@ -737,3 +737,30 @@ pipeline, build `nfs`): 20 s runs with 0 underruns at 48 × 2 (2.0 ms), 32 × 3 
 595/769/1,772 µs (deadline 1,000); 226 periods over deadline were absorbed by the buffer; 43.3 → 49.2 °C,
 no new throttling. **Full's in-device buffering drops from 4.0 ms (pipeline, 64 × 2) to 2.0 ms** at the same
 underrun rate, using 3 cores (CPU 267%).
+
+### Open-item follow-ups (2026-10-25)
+
+**mmap with 2 periods** (`mmapdbg_*`): sampling `/proc/asound/card2/pcm0p/sub0/status` mid-run (Lite, 64 × 2):
+read/write keeps `appl_ptr − hw_ptr` at 60–126 frames; mmap keeps ~64–68 and dropped to 2, and its
+`hw_ptr` reset to near 0 twice in 8 s (stream restarts; 3 underruns this run, 0 in the earlier 20 s sweep).
+So with mmap less audio is queued ahead of the USB endpoint (`lowlatency=Y` in snd-usb-audio), leaving less
+slack for slow blocks, which is why it fails first with Full. Mechanism observed; the driver-level root cause
+is a hypothesis (the low-latency playback path behaves differently for mmap commits). Decision: keep
+read/write access.
+
+**Frame split stalls** (`summary_x_fs_stalls.csv`, 60 s paced, block 32):
+- 4 threads (cores 3, 2, 1, 0): p50 294 µs, 38 misses (0.04%), 13 stalls > 5 ms (max 7.4 ms) in two clusters.
+  `dmesg` has **no "RT throttling activated"** message since boot (2026-10-24 17:38), which covers the
+  low-latency agent's 4-core runs (02:47), so the earlier 41–51 ms stalls were **not RT throttling**.
+  Most likely cause (not traced): the worker on core 0, which also runs the OS and the USB IRQs (~2,000/s per
+  core); every layer barrier waits for it.
+- 2 threads at 32: no slow stretches in 60 s, but 330 misses (0.37%) at 76% load; simply too tight.
+- Decision: 3 threads on cores 1–3, core 0 left to Linux (as used live).
+
+**Declined, with reasons:**
+- Kernel load scheduling (roadmap R2-5/agent estimate 5–8%): a hand-scheduled asm conv measured +1% on the
+  whole tile (docs/low-latency-plan.md); not worth the maintenance.
+- Mixed compilers (GCC for Lite, clang for Full): GCC's Lite gain is 6% (`gcc14`) on a model already at
+  ~32–40% load; Full is what limits latency, and clang wins there by 26%.
+- Pipeline-stack patch on top of frame split: not needed; frame split already creates its workers with a
+  256 KB stack.

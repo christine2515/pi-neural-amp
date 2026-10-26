@@ -121,11 +121,14 @@ Copy back to the laptop into its own folder, so Pi data never mixes with Mac tes
 
 ## 8. Live tuning with the Scarlett (after the offline runs)
 
-Wiring: guitar → Scarlett input 1 (INST on) → USB → Pi → Scarlett headphones. **Direct Monitor off.**
+Wiring: guitar → Scarlett instrument input (input 2 on a Solo, INST on; ALSA capture channel 1) → USB → Pi → Scarlett headphones. **Direct Monitor off.**
 If the Scarlett drops out or crackles, power it from a powered USB hub instead of the Pi.
 
     arecord -l                     # find the card name; usually "USB" -> DEVICE=hw:USB
-    ./build/live --model models/a2_fender_super_reverb.nam --slim 1 --period 128 --periods 2 --duration 60
+    ./build/live --device hw:USB --in-channel 1 --model models/a2_fender_super_reverb.nam --slim 0.25 --period 32 --periods 2 --rt --cpu 3 --gate -50 --duration 60   # Lite
+    NAM_A2_FSPLIT=8 NAM_A2_FSPLIT_THREADS=3 NAM_A2_FSPLIT_CPUS=2,1 NAM_A2_FSPLIT_PRIO=80 ./build-nfs/live --device hw:USB --in-channel 1 --model models/a2_fender_super_reverb.nam --slim 1 --period 48 --periods 2 --rt --cpu 3 --gate -50 --duration 60   # Full, frame split
+
+Current recommended settings and their measured numbers: docs/step2/state-of-the-union.md.
 
 That's the playable amp. Each run appends a row to `results/live_summary.csv` (xruns, process
 time, period jitter, CPU). Then tune:
@@ -137,7 +140,7 @@ time, period jitter, CPU). Then tune:
 The offline `kpi_smallest_block.csv` predicts where live should start working; the gap between
 the two is driver + USB overhead (`--bypass` rows show it with no model at all).
 
-**Round-trip latency.** Unplug the guitar and connect a cable from a Scarlett output to input 1:
+**Round-trip latency.** Unplug the guitar and connect a cable from a Scarlett output to the instrument input (input 2 on a Solo; RCA → ¼" from its RCA line outs):
 
     ./scripts/latency_test.sh                                     # results/live_latency.csv
 
